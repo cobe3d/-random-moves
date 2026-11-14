@@ -273,7 +273,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
   cursor: grab; user-select: none; -webkit-user-select: none;
 }
 .card.dragging { z-index: 5; cursor: grabbing; box-shadow: 0 14px 34px rgb(0 0 0 / .35); }
-.card img { width: 100%; aspect-ratio: 1; object-fit: contain; background: #000; display: block; pointer-events: none; }
+.card img, .card video { width: 100%; aspect-ratio: 1; object-fit: contain; background: #000; display: block; pointer-events: none; }
 /* the number doubles as the drag grip; on touch screens only it drags, so the rest of the card still scrolls */
 .card .idx {
   position: absolute; top: 12px; left: 8px; min-width: 40px; height: 34px; padding: 0 8px; border: 0; border-radius: 17px;
@@ -324,8 +324,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .p-step { width: 34px; height: 34px; border-radius: 50%; font-size: 18px; touch-action: manipulation; }
 /* pinned to the stage box so a large picture can't stretch the row and get cropped */
 /* the picture never starts the browser's own image drag, which would cancel a swipe */
-.stage img { pointer-events: none; -webkit-user-drag: none; }
-.stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+.stage img, .stage video { pointer-events: none; -webkit-user-drag: none; }
+.stage img, .stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
 .flash { position: absolute; inset: 0; border-radius: 18px; box-shadow: inset 0 0 0 10px var(--active); opacity: 0; pointer-events: none; }
 .done {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
@@ -384,17 +384,17 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 
   <section class="connect" id="connect">
     <pre class="tree">圖片庫/
-├─ 熱身/     (伸展.jpg …、熱身歌.mp3)
+├─ 熱身/     (伸展.mp4 …、熱身歌.mp3)
 ├─ 上半身/   (封面.jpg、伏地挺身.jpg …)
 ├─ 加速/
 └─ 音樂/     (01mp3/、02mp3/ …)</pre>
     <p>把手機裡的圖片庫匯入 App，只要匯入一次，之後打開就有，沒有網路也能用。檔案只存在這支手機裡，不會上傳。</p>
     <button class="primary" id="importFolder" type="button">📥 匯入資料夾</button>
     <button class="secondary" id="importFiles" type="button">📥 選檔案匯入</button>
-    <p class="hint">不能選資料夾時用「選檔案匯入」，用檔名開頭分類：圖片取名「分類_名稱.jpg」（例如「熱身_伸展.jpg」、「上半身_胸_伏地挺身.jpg」），音樂取名「01mp3_歌名.mp3」、「熱身_歌名.mp3」。</p>
+    <p class="hint">不能選資料夾時用「選檔案匯入」，用檔名開頭分類：圖片取名「分類_名稱.jpg」（例如「熱身_伸展.jpg」、「上半身_胸_伏地挺身.jpg」），熱身和加速的影片取名「熱身_名稱.mp4」、「加速_名稱.mp4」，音樂取名「01mp3_歌名.mp3」、「熱身_歌名.mp3」。</p>
     <p class="pick-error" id="pickError" role="alert" hidden></p>
     <input type="file" id="dirInput" webkitdirectory multiple hidden>
-    <input type="file" id="fileInput" multiple accept="image/*,audio/*,.mp3,.m4a" hidden>
+    <input type="file" id="fileInput" multiple accept="image/*,audio/*,video/*,.mp3,.m4a,.mp4" hidden>
   </section>
 
   <section id="folderBox" hidden>
@@ -432,6 +432,11 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
         <label for="volume">節拍音量</label>
         <input type="range" id="volume" min="0" max="100" step="1">
         <span></span>
+      </div>
+      <div class="vrow" id="videoVolumeField" hidden>
+        <label for="videoVolume">影片音量</label>
+        <input type="range" id="videoVolume" min="0" max="100" step="1">
+        <button class="secondary small mute" id="videoMute" type="button" aria-pressed="false">🔊 靜音</button>
       </div>
       <div class="vrow" id="musicVolumeField" hidden>
         <label for="musicVolume">音樂音量</label>
@@ -495,6 +500,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
   </div>
   <div class="stage">
     <img id="pImg" alt="" draggable="false">
+    <video id="pVid" loop playsinline hidden></video>
     <div class="flash" id="flash"></div>
     <div class="done" id="pDone" hidden>
       <h2>全部完成！</h2>
@@ -529,13 +535,15 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
   const DEFAULTS = {
     bpms: Array.from({ length: MAX_SLOTS }, (_, i) => 60 + i * 10),
     seconds: Array(MAX_SLOTS).fill(30),
-    count: 5, volume: 80, musicVolume: 60, warm: true, warmSecs: 60, boost: true, boostSecs: 30,
+    count: 5, volume: 80, videoVolume: 70, videoMuted: false, musicVolume: 60, warm: true, warmSecs: 60, boost: true, boostSecs: 30,
     draw: 5, timeMode: 'uniform', uniform: 30,
     off: [], // folder names the user switched off, so newly added folders start switched on
   };
   // kept apart from the desktop page (random-images.html) so the two never overwrite each other's settings
   const STORE_KEY = 'random-cards-mobile-v1';
   const IMG_RE = /\.(jpe?g|png|webp)$/i;
+  // 熱身 and 加速 play videos; the regular movements are pictures
+  const VIDEO_RE = /\.(mp4|m4v|webm|mov)$/i;
   // a picture named 封面 or cover is its folder's cover, never drawn
   const COVER_RE = /^(封面|cover)\.[^.]+$/i;
   const AUDIO_RE = /\.(mp3|m4a|aac|wav|ogg|flac)$/i;
@@ -561,6 +569,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
           count: Math.min(MAX_SLOTS, Math.max(1, Number(s.count) || DEFAULTS.count)),
           volume: Number.isFinite(s.volume) ? s.volume : DEFAULTS.volume,
           musicVolume: Number.isFinite(s.musicVolume) ? s.musicVolume : DEFAULTS.musicVolume,
+          videoVolume: Number.isFinite(s.videoVolume) ? s.videoVolume : DEFAULTS.videoVolume,
+          videoMuted: s.videoMuted === true,
           warm: s.warm !== false,
           warmSecs: clampDur(Number(s.warmSecs) || DEFAULTS.warmSecs),
           boost: s.boost !== false,
@@ -655,9 +665,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
   function addEntry(root, name, dirs, src) {
     const seg = segOf(dirs);
     if (AUDIO_RE.test(name)) return (seg ? root.segs[seg].tracks : root.tracks).push({ name, folder: dirs.join(' › ') || '圖片庫最外層', group: seg ? null : groupOf(dirs), ...src });
+    if (seg) return VIDEO_RE.test(name) ? root.segs[seg].clips.push({ name, key: SEGS[seg].folder, folder: dirs.join(' › '), video: true, ...src }) : undefined;
     if (!IMG_RE.test(name)) return;
     const isCover = COVER_RE.test(name);
-    if (seg) return isCover ? undefined : root.segs[seg].clips.push({ name, key: SEGS[seg].folder, folder: dirs.join(' › '), ...src });
     // a cover sitting loose in the library itself has no folder to be the cover of
     if (isCover && !dirs.length) return;
     let node = root;
@@ -714,7 +724,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     if (tree.items.length) folders.push(Object.assign(newNode(LOOSE, LOOSE), { items: tree.items }));
     tracks = tree.tracks.sort((a, b) => byName(a.name, b.name));
     for (const [k, s] of Object.entries(SEGS)) {
-      s.clips = groupFrames(tree.segs[k].clips);
+      s.clips = tree.segs[k].clips.sort((a, b) => byName(a.name, b.name));
       s.tracks = tree.segs[k].tracks.sort((a, b) => byName(a.name, b.name));
       s.card = null;
     }
@@ -736,14 +746,15 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     if (rel) return rel.split('/').slice(1).join('/');
     const parts = file.name.split('_').filter(Boolean);
     if (parts.length < 2) return file.name;
-    if (!AUDIO_RE.test(file.name)) return parts.join('/');
     const head = parts[0];
+    if (VIDEO_RE.test(file.name)) return segOf([head]) ? head + '/' + parts.slice(1).join('_') : file.name;
+    if (!AUDIO_RE.test(file.name)) return parts.join('/');
     return segOf([head]) || groupNum(head) != null || /^0*[1-9][0-9]*$/.test(head) ? head + '/' + parts.slice(1).join('_') : file.name;
   }
   let importing = false;
   async function importFiles(list) {
-    const wanted = list.filter(f => IMG_RE.test(f.name) || AUDIO_RE.test(f.name));
-    if (!wanted.length) return toast('沒有找到 jpg／png／webp 圖片或 mp3 音樂');
+    const wanted = list.filter(f => IMG_RE.test(f.name) || AUDIO_RE.test(f.name) || VIDEO_RE.test(f.name));
+    if (!wanted.length) return toast('沒有找到 jpg／png／webp 圖片、mp4 影片或 mp3 音樂');
     if (importing) return;
     importing = true;
     try {
@@ -902,7 +913,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
   function redrawSeg(k) {
     const s = SEGS[k];
     const rest = s.clips.filter(c => !s.card || c !== s.card.clip);
-    if (!rest.length) return toast(`「${s.folder}」裡沒有其他圖片可以換了`);
+    if (!rest.length) return toast(`「${s.folder}」裡沒有其他影片可以換了`);
     // the new picture keeps the song the old one had
     s.card = { clip: pick(rest), seg: k, song: s.card ? s.card.song : null };
     if (!s.card.song) s.card.song = songForCard(s.card);
@@ -1088,6 +1099,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     timer = setInterval(tick, 25);
     tick();
     if (nowPlaying && music.src) music.play().catch(() => {});
+    if (!$('pVid').hidden && $('pVid').getAttribute('src')) $('pVid').play().catch(() => {});
     requestWake();
     renderPlayer();
   }
@@ -1095,6 +1107,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     playing = false;
     clearInterval(timer);
     music.pause();
+    $('pVid').pause();
     beatQueue.length = 0;
     releaseWake();
     renderPlayer();
@@ -1185,6 +1198,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     pause();
     $('player').hidden = true;
     $('pImg').removeAttribute('src');
+    // stop the video from holding its file open in the background
+    $('pVid').removeAttribute('src');
+    $('pVid').load();
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   }
   // the pictures of the movement on screen, which one shows, and when it last changed (for the segments without a beat)
@@ -1194,9 +1210,21 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     document.documentElement.style.setProperty('--active', slotColor(c));
     renderPlayer();
     let urls;
-    try { urls = await Promise.all((c.clip.frames || [c.clip]).map(urlOf)); } catch (e) { return toast('讀不到這張圖片，可能被移走了'); }
+    try { urls = await Promise.all((c.clip.frames || [c.clip]).map(urlOf)); } catch (e) { return toast('讀不到這個檔案，可能被移走了'); }
     // skip if the player moved on while the files were opening
     if (cur() !== c || $('player').hidden) return;
+    const v = $('pVid');
+    $('pImg').hidden = !!c.clip.video;
+    v.hidden = !c.clip.video;
+    if (c.clip.video) {
+      frameUrls = [];
+      $('pImg').removeAttribute('src');
+      v.src = urls[0];
+      if (playing) v.play().catch(() => {});
+      return;
+    }
+    v.pause();
+    v.removeAttribute('src');
     frameUrls = urls;
     frameAt = 0;
     frameSwap = performance.now();
@@ -1395,6 +1423,28 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     applyMusicVolume();
     save();
   });
+  function applyVideoVolume() {
+    $('pVid').volume = Math.pow(settings.videoVolume / 100, 2);
+    $('pVid').muted = settings.videoMuted;
+    $('videoVolume').disabled = settings.videoMuted;
+    $('videoMute').textContent = settings.videoMuted ? '🔇 已靜音' : '🔊 靜音';
+    $('videoMute').setAttribute('aria-pressed', String(settings.videoMuted));
+  }
+  $('videoVolume').value = settings.videoVolume;
+  applyVideoVolume();
+  $('videoVolume').addEventListener('input', e => {
+    settings.videoVolume = Number(e.target.value);
+    applyVideoVolume();
+    save();
+  });
+  $('videoMute').addEventListener('click', () => {
+    settings.videoMuted = !settings.videoMuted;
+    applyVideoVolume();
+    save();
+  });
+  $('pVid').addEventListener('error', () => {
+    if ($('pVid').getAttribute('src')) toast('這個影片手機播不了，可以轉成 mp4 再試');
+  });
   $('pImg').addEventListener('error', () => {
     if ($('pImg').getAttribute('src')) toast('這張圖片打不開，可能壞掉了或不是 jpg／png／webp');
   });
@@ -1455,6 +1505,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     });
 
     $('musicVolumeField').hidden = !tracks.length && !Object.values(SEGS).some(s => s.tracks.length);
+    $('videoVolumeField').hidden = !Object.values(SEGS).some(s => s.clips.length);
 
     $('draw').textContent = cards.length ? '🎲 全部重抽' : '🎲 抽動作';
     $('draw').disabled = !p.length;
@@ -1514,12 +1565,17 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     el.className = 'card seg';
     el.style.setProperty('--c', slotColor(c));
     el.style.setProperty('--ink', slotInk(c));
-    el.innerHTML = `<img alt="" draggable="false"><span class="idx">${s.icon} ${s.label}</span>
-      <button class="re" type="button" aria-label="換掉${s.label}圖片" title="換一個${s.label}圖片">🔄</button>
+    el.innerHTML = `<video muted preload="metadata" playsinline></video><span class="idx">${s.icon} ${s.label}</span>
+      <button class="re" type="button" aria-label="換掉${s.label}影片" title="換一個${s.label}影片">🔄</button>
       <div class="info"><span class="src"></span><span class="chip">不打節拍 · ${cardSecs(c)}s</span></div>`;
-    el.querySelector('.src').textContent = c.clip.folder + frameNote(c.clip);
+    el.querySelector('.src').textContent = c.clip.folder;
     el.title = c.clip.name;
-    setThumb(el.querySelector('img'), c.clip);
+    const vid = el.querySelector('video');
+    // a paused video showing the frame half a second in works as its thumbnail; its length goes beside the folder
+    urlOf(c.clip).then(u => { vid.src = u + '#t=0.5'; }).catch(() => {});
+    vid.addEventListener('loadedmetadata', () => {
+      if (Number.isFinite(vid.duration)) el.querySelector('.src').textContent = c.clip.folder + ' · ' + fmt(vid.duration * 1000);
+    });
     el.querySelector('.re').addEventListener('click', () => redrawSeg(k));
     const tune = tuneEl(c, () => redrawSeg(k));
     if (tune) el.appendChild(tune);
@@ -1613,7 +1669,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     const seg = c.seg && SEGS[c.seg];
     $('pIdx').textContent = seg ? `${seg.icon} ${seg.label}` + (c.seg === 'boost' && boostRound > 1 ? ` #${boostRound}` : '')
       : `${cards.indexOf(c) + 1} / ${cards.length}`;
-    $('pSrc').textContent = c.clip.folder + ' · ' + c.clip.name.replace(IMG_RE, '') + frameNote(c.clip);
+    $('pSrc').textContent = c.clip.folder + ' · ' + c.clip.name.replace(IMG_RE, '').replace(VIDEO_RE, '') + frameNote(c.clip);
     $('pBpm').textContent = seg ? seg.label : bpm();
     $('pUnit').hidden = !!seg;
     $('pSlower').hidden = $('pFaster').hidden = !!seg;
