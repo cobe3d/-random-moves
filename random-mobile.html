@@ -1,0 +1,1648 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>隨機動作圖片・手機版</title>
+<meta name="theme-color" content="#241d22">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+/* Layout: library bar → folder cards → draw settings → BPM slots → drawn cards; playback is a full-screen overlay */
+/* "夜櫻" theme: a dark plum page with soft cherry-blossom pink as the accent, the same in light and dark system modes */
+:root {
+  --bg: #241d22;
+  --surface: #30272d;
+  --line: #45383f;
+  --fg: #f7e8ef;
+  --muted: #bfa6b2;
+  --accent: #f2a7c3; --on-accent: #3a1f2b;
+  /* one soft pastel per BPM slot, with dark text on top */
+  --p1: #f29bb7; --ink1: #3a1f2b;
+  --p2: #8fb8e6; --ink2: #1d2a3a;
+  --p3: #efd08a; --ink3: #3a2e14;
+  --p4: #8fd1b0; --ink4: #183326;
+  --p5: #c4a7ee; --ink5: #2a1f3d;
+  --warm: #86d3c3; --warm-ink: #17312b;
+  --boost: #f4a582; --boost-ink: #3a1f14;
+  --active: var(--p1);
+  /* playback screen: darker still, so the picture stands out */
+  --player: #17121a; --player-panel: #241c22; --player-line: #3a2e35; --player-hover: #30262c; --player-muted: #bfa6b2;
+  /* the phone's own fonts, so it looks the same offline (Android: Roboto Condensed and Noto Sans CJK) */
+  --f-display: "Roboto Condensed", "sans-serif-condensed", "Arial Narrow", sans-serif;
+  --f-body: "Noto Sans CJK TC", "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+/* a few faint yoga figures drift over the page background */
+body {
+  background: var(--bg) url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='520' height='520'><g transform='translate(40,50) scale(1.6)' opacity='0.14'><g fill='%23f2a7c3'><circle cx='20' cy='10' r='3.2'/></g><g fill='none' stroke='%23f2a7c3' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'><path d='M20 14 L20 25 M20 16 L11 9 L18 1 M20 16 L29 9 L22 1 M20 25 L20 38 M20 25 L28 30 L21 33'/></g></g><g transform='translate(330,30) scale(1.7)' opacity='0.14'><g fill='%23f2a7c3'><circle cx='20' cy='8' r='3.4'/></g><g fill='none' stroke='%23f2a7c3' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'><path d='M20 12 L20 23 M5 14 L35 14 M20 23 L29 28 L30 37 M20 23 L9 37'/></g></g><g transform='translate(200,220) scale(1.8)' opacity='0.1'><g fill='%23f2a7c3'><circle cx='20' cy='7' r='3.6'/></g><g fill='none' stroke='%23f2a7c3' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'><path d='M20 12 L20 25 M20 15 L11 18 L8 26 M20 15 L29 18 L32 26 M5 32 Q20 25 35 32 Q20 36 5 32'/></g></g><g transform='translate(40,360) scale(1.7)' opacity='0.14'><g fill='%23f2a7c3'><circle cx='11' cy='27' r='3.2'/></g><g fill='none' stroke='%23f2a7c3' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'><path d='M5 37 L14 22 L23 10 L35 37'/></g></g><g transform='translate(380,330) scale(1.6)' opacity='0.14'><g fill='%23f2a7c3'><circle cx='34' cy='18' r='3.2'/></g><g fill='none' stroke='%23f2a7c3' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 38 L16 25 L33 38 M16 25 L29 21 M29 21 L32 36 M29 21 L27 4'/></g></g></svg>") repeat;
+  color: var(--fg);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.app {
+  max-width: 980px;
+  margin: 0 auto;
+  padding-block: 18px 60px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+[hidden] { display: none !important; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: default; }
+:focus-visible { outline: 3px solid var(--active); outline-offset: 2px; }
+
+header { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-bottom: 14px; }
+/* a soft wavy line under the header */
+header::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 8px; background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 8'><path d='M0 4 Q10 0 20 4 T40 4' fill='none' stroke='%23f2a7c3' stroke-opacity='.55' stroke-width='1.4'/></svg>") repeat-x center / 40px 8px; }
+h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .04em; display: flex; align-items: center; gap: 8px; }
+/* a seated yoga figure before the title and a little sparkle after it */
+h1::before { content: ""; width: 32px; height: 32px; flex: none; background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><g transform='translate(0,0) scale(1)' opacity='1'><g fill='%23f2a7c3'><circle cx='20' cy='7' r='3.6'/></g><g fill='none' stroke='%23f2a7c3' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'><path d='M20 12 L20 25 M20 15 L11 18 L8 26 M20 15 L29 18 L32 26 M5 32 Q20 25 35 32 Q20 36 5 32'/></g></g></svg>") center / contain no-repeat; }
+h1::after { content: "✧"; color: var(--accent); font-size: 14px; font-weight: 400; }
+.lib { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
+.lib b { color: var(--fg); }
+.link { border: 0; background: none; padding: 0; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; font-size: 13px; }
+
+.section-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.section-head h2 { margin: 0; font-size: 15px; font-weight: 700; }
+.section-head h2::before { content: ""; display: inline-block; width: 17px; height: 17px; margin-right: 6px; vertical-align: -3px; background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><g transform='translate(0,0) scale(1)' opacity='1'><g fill='%23f2a7c3'><circle cx='20' cy='8' r='3.4'/></g><g fill='none' stroke='%23f2a7c3' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'><path d='M20 12 L20 23 M5 14 L35 14 M20 23 L29 28 L30 37 M20 23 L9 37'/></g></g></svg>") center / contain no-repeat; }
+.head-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.hint { margin: 0 0 10px; font-size: 12px; color: var(--muted); }
+
+.primary {
+  min-height: 56px; padding: 0 24px; border: 0; border-radius: 14px;
+  background: var(--accent); color: var(--on-accent);
+  font-size: 18px; font-weight: 700; letter-spacing: .08em;
+}
+.secondary {
+  min-height: 56px; padding: 0 18px; border: 1px solid var(--line); border-radius: 14px;
+  background: var(--surface); font-size: 15px; font-weight: 500;
+}
+.primary:disabled, .secondary:disabled { opacity: .4; }
+.primary:active:not(:disabled), .secondary:active:not(:disabled) { transform: translateY(1px); }
+.small { min-height: 34px; padding: 0 12px; border-radius: 10px; font-size: 13px; }
+
+/* connect panel */
+.connect {
+  background: var(--surface); border: 1.5px dashed var(--line); border-radius: 16px;
+  padding: 28px 20px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center;
+}
+.connect p { margin: 0; color: var(--muted); font-size: 14px; max-width: 34em; }
+.connect .pick-error { color: var(--p1); font-weight: 500; }
+.tree {
+  margin: 0; padding: 10px 16px; border-radius: 10px; background: var(--bg);
+  font-family: ui-monospace, Consolas, monospace; font-size: 13px; text-align: left; white-space: pre; color: var(--muted);
+}
+
+/* folder cards */
+.folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; align-items: start; }
+.folder {
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+  transition: box-shadow .15s;
+}
+.folder .head {
+  position: relative; display: flex; flex-direction: column; text-align: left; padding: 0; width: 100%;
+  border: 0; background: none; transition: opacity .15s;
+}
+.folder .cover { aspect-ratio: 4 / 3; width: 100%; object-fit: cover; background: var(--bg); display: block; }
+.folder .meta { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 1px; }
+.folder .name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder .n { font-size: 12px; color: var(--muted); }
+.folder .tick {
+  position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 15px; font-weight: 700;
+  background: rgb(0 0 0 / .35); color: #fff; border: 2px solid #fff;
+}
+.folder[data-state="true"] { box-shadow: 0 0 0 2.5px var(--accent); border-color: var(--accent); }
+.folder[data-state="mixed"] { box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--accent) 45%, transparent); }
+.folder:not([data-state="false"]) .tick { background: var(--accent); color: var(--on-accent); border-color: var(--on-accent); }
+.folder[data-state="false"] .head { opacity: .5; }
+.folder[data-state="false"] .tick { color: transparent; }
+
+/* subfolder checkboxes inside a folder card */
+.subs {
+  border-top: 1px solid var(--line); padding: 6px; max-height: 260px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.sub {
+  display: flex; align-items: center; gap: 8px; min-height: 36px;
+  padding: 4px 8px 4px calc(8px + var(--depth, 0) * 18px); border-radius: 8px;
+  font-size: 14px; cursor: pointer;
+}
+.sub:hover { background: color-mix(in srgb, var(--line) 50%, transparent); }
+.sub input { width: 18px; height: 18px; margin: 0; flex: none; accent-color: var(--accent); cursor: pointer; }
+.sub .thumb { width: 64px; height: 48px; flex: none; border-radius: 6px; object-fit: cover; background: var(--bg); display: block; }
+.sub:has(input:not(:checked):not(:indeterminate)) .thumb { opacity: .45; }
+.sub .sname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub .n { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* number stepper */
+.count {
+  display: inline-flex; align-items: center;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
+}
+.count button {
+  border: 0; background: transparent; color: var(--muted);
+  width: 34px; height: 34px; font-size: 18px; line-height: 1; border-radius: 9px;
+  touch-action: manipulation;
+}
+.count button:hover:not(:disabled) { color: var(--fg); }
+.count button:disabled { opacity: .35; }
+.count span { min-width: 3.6em; text-align: center; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.count input {
+  width: 3.4em; border: 0; background: transparent; text-align: center; padding: 0;
+  font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield; appearance: textfield;
+}
+input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* draw settings */
+/* draw count and play time on the left, the volume panel on the right */
+.settings { display: grid; grid-template-columns: auto auto minmax(300px, 440px); justify-content: space-between; align-items: start; gap: 14px 28px; }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.field .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--fg); }
+@media (max-width: 860px) {
+  .settings { grid-template-columns: auto 1fr; }
+  .volumes { grid-column: 1 / -1; }
+}
+@media (max-width: 420px) { .settings { grid-template-columns: 1fr; } }
+
+/* volume panel: name | slider | button, one row each, so the sliders line up */
+.volumes {
+  display: grid; grid-template-columns: auto 1fr 7.2em; align-items: center; gap: 10px 12px;
+  padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+}
+.vrow { display: contents; }
+.volumes label { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.volumes input[type="range"] { width: 100%; min-width: 0; margin: 0; accent-color: var(--accent); }
+.volumes input[type="range"]:disabled { opacity: .35; }
+.volumes .mute { width: 100%; min-height: 34px; padding: 0 8px; }
+.volumes .mute[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+
+/* mode switch */
+.seg { display: inline-flex; padding: 3px; gap: 3px; border-radius: 10px; background: var(--line); }
+.seg button {
+  border: 0; border-radius: 8px; background: transparent; color: var(--muted);
+  padding: 5px 12px; font-size: 14px; font-weight: 500;
+}
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--fg); font-weight: 700; box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+
+/* BPM slots */
+.slots { display: grid; grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr)); gap: 8px; max-width: 880px; }
+@media (max-width: 640px) {
+  .slots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .slot .segsecs input { width: 1.7em; font-size: 24px; }
+}
+/* warm-up first and speed-up last, shaped like the BPM slots: name, seconds, on/off */
+.segslot .num { padding-top: 6px; font-size: 12px; font-weight: 700; color: var(--fg); }
+.segslot .segsecs { flex: 1; display: flex; align-items: center; justify-content: center; gap: 2px; font-size: 12px; color: var(--muted); }
+.slot .segsecs input { width: 2.2em; color: var(--fg); border-bottom: 1.5px dashed var(--line); }
+.segslot .seg.mini { display: flex; margin: 0 6px 6px; padding: 2px; gap: 2px; }
+.segslot .seg.mini button { flex: 1; padding: 3px 0; font-size: 12px; }
+.segslot.off { opacity: .55; }
+.slot {
+  display: flex; flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line); border-top: 7px solid var(--c);
+  border-radius: 12px; overflow: hidden;
+}
+.num { padding-top: 4px; text-align: center; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.slot input {
+  width: 100%; min-width: 0; border: 0; background: transparent;
+  text-align: center; padding: 0;
+  font-family: var(--f-display); font-weight: 800; font-size: 30px; line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield; appearance: textfield;
+}
+.step {
+  border: 0; background: transparent; color: var(--muted);
+  min-height: 34px; font-size: 20px; line-height: 1;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none;
+}
+.step:hover { background: color-mix(in srgb, var(--line) 50%, transparent); color: var(--fg); }
+.dur {
+  display: flex; align-items: baseline; justify-content: center; gap: 2px;
+  border-top: 1px solid var(--line); padding: 4px 4px 6px;
+  font-size: 12px; color: var(--muted);
+}
+.slot .dur input {
+  width: 2.8em; font-size: 19px; font-weight: 600; line-height: 1.1;
+  border-bottom: 1.5px dashed var(--line);
+}
+
+/* drawn cards */
+.actions { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+.actions .primary, .actions .secondary { min-height: 72px; font-size: 20px; font-weight: 700; letter-spacing: .06em; }
+@media (max-width: 640px) {
+  .actions { grid-template-columns: 1fr; }
+}
+.total { margin: 8px 0 0; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.card.seg { cursor: default; }
+.card.seg .idx { cursor: default; background: var(--c); color: var(--ink); font-family: var(--f-body); font-size: 14px; }
+.card.seg .idx::before { content: none; }
+
+/* each card's background song scrolls under it like a marquee, with its change button below */
+.tune { border-top: 1px solid var(--line); padding: 0 0 8px; display: flex; flex-direction: column; gap: 6px; cursor: default; }
+/* edge to edge, the same width as the picture thumbnail above */
+.marquee { overflow: hidden; white-space: nowrap; font-size: 13px; font-weight: 500; padding: 7px 0; background: color-mix(in srgb, var(--line) 35%, transparent); }
+.marquee span { display: inline-block; padding-left: 100%; animation: marquee var(--dur, 10s) linear infinite; }
+.marquee:hover span { animation-play-state: paused; }
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+.tune .tune-re { margin: 0 8px; }
+.tune.no-song { padding-top: 8px; }
+@media (prefers-reduced-motion: reduce) {
+  .marquee { text-overflow: ellipsis; }
+  .marquee span { display: inline; padding-left: 0; animation: none; }
+}
+
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-top: 12px; }
+.card {
+  position: relative; background: var(--surface); border: 1px solid var(--line);
+  border-top: 6px solid var(--c); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column;
+  cursor: grab; user-select: none; -webkit-user-select: none;
+}
+.card.dragging { z-index: 5; cursor: grabbing; box-shadow: 0 14px 34px rgb(0 0 0 / .35); }
+.card img { width: 100%; aspect-ratio: 1; object-fit: contain; background: #000; display: block; pointer-events: none; }
+/* the number doubles as the drag grip; on touch screens only it drags, so the rest of the card still scrolls */
+.card .idx {
+  position: absolute; top: 12px; left: 8px; min-width: 40px; height: 34px; padding: 0 8px; border: 0; border-radius: 17px;
+  display: flex; align-items: center; gap: 3px; background: var(--accent); color: var(--on-accent);
+  font-family: var(--f-display); font-weight: 800; font-size: 18px;
+  cursor: grab; touch-action: none;
+}
+.card .idx::before { content: "⠿"; font-family: var(--f-body); font-size: 14px; opacity: .6; }
+.card .re {
+  position: absolute; top: 12px; right: 8px; width: 34px; height: 34px; border-radius: 50%;
+  border: 0; background: rgb(0 0 0 / .5); color: #fff; font-size: 17px; display: grid; place-items: center;
+}
+.card .re:hover { background: rgb(0 0 0 / .75); }
+.card .info { padding: 8px 10px 10px; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.card .src { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.chip {
+  flex: none; padding: 2px 8px; border-radius: 999px; background: var(--c); color: var(--ink);
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.empty::before { content: ""; display: block; width: 44px; height: 44px; margin: 0 auto 8px; background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><g transform='translate(0,0) scale(1)' opacity='1'><g fill='%23f2a7c3'><circle cx='20' cy='10' r='3.2'/></g><g fill='none' stroke='%23f2a7c3' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'><path d='M20 14 L20 25 M20 16 L11 9 L18 1 M20 16 L29 9 L22 1 M20 25 L20 38 M20 25 L28 30 L21 33'/></g></g></svg>") center / contain no-repeat; opacity: .8; }
+.empty { margin-top: 12px; padding: 26px; text-align: center; color: var(--muted); font-size: 14px; border: 1.5px dashed var(--line); border-radius: 14px; }
+
+/* playback overlay */
+.player {
+  position: fixed; inset: 0; z-index: 10; background: var(--player); color: var(--fg);
+  display: grid; grid-template-rows: auto 1fr auto;
+  padding: max(10px, env(safe-area-inset-top, 0px)) max(14px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(14px, env(safe-area-inset-left, 0px));
+  gap: 10px;
+}
+.p-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.p-where { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+.p-where b { font-family: var(--f-display); font-weight: 800; font-size: 28px; font-variant-numeric: tabular-nums; }
+.p-where span { color: var(--player-muted); font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.icon {
+  width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--player-line); background: var(--player-panel); color: var(--fg);
+  font-size: 18px; display: inline-grid; place-items: center;
+}
+.icon:hover:not(:disabled) { background: var(--player-hover); }
+.icon:disabled { opacity: .35; }
+.p-tools { display: flex; gap: 8px; }
+.p-song { flex: 1; min-width: 0; text-align: right; color: var(--player-muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stage {
+  position: relative; min-height: 0; border-radius: 18px; overflow: hidden; background: #000;
+  cursor: pointer;
+}
+.player { user-select: none; -webkit-user-select: none; touch-action: none; }
+/* − / ＋ beside the BPM number */
+.p-step { width: 34px; height: 34px; border-radius: 50%; font-size: 18px; touch-action: manipulation; }
+/* pinned to the stage box so a large picture can't stretch the row and get cropped */
+/* the picture never starts the browser's own image drag, which would cancel a swipe */
+.stage img { pointer-events: none; -webkit-user-drag: none; }
+.stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+.flash { position: absolute; inset: 0; border-radius: 18px; box-shadow: inset 0 0 0 10px var(--active); opacity: 0; pointer-events: none; }
+.done {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  background: color-mix(in srgb, var(--player) 85%, transparent); text-align: center;
+}
+.done h2 { margin: 0; font-size: clamp(32px, 7vw, 56px); }
+.done .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.done .primary { background: var(--accent); color: var(--on-accent); }
+.done .secondary { background: var(--player-panel); border-color: var(--player-line); color: var(--fg); }
+.p-bottom { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; }
+.p-tempo { display: flex; align-items: flex-end; gap: 8px; }
+.p-bpm { font-family: var(--f-display); font-weight: 800; font-size: clamp(32px, 5vw, 48px); line-height: .82; color: var(--active); font-variant-numeric: tabular-nums; }
+.p-meta { display: flex; flex-direction: column; color: var(--player-muted); font-size: 11px; }
+.p-meta .unit { font-family: var(--f-display); font-weight: 600; font-size: 12px; letter-spacing: .28em; }
+.p-ctrl { display: flex; gap: 8px; align-items: center; }
+.p-ctrl .play { width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--accent); color: var(--on-accent); font-size: 18px; display: grid; place-items: center; }
+.p-ctrl .icon { width: 38px; height: 38px; border-radius: 50%; font-size: 15px; }
+@media (max-width: 640px) {
+  .p-bottom { grid-template-columns: 1fr 1fr; }
+  .p-ctrl { grid-column: 1 / -1; grid-row: 2; justify-content: center; gap: 16px; }
+  .p-song { display: none; }
+  .p-ctrl .play { width: 64px; height: 64px; font-size: 24px; }
+  .p-ctrl .icon { width: 52px; height: 52px; font-size: 19px; }
+  .p-bpm { font-size: 44px; }
+  .p-step { width: 42px; height: 42px; font-size: 22px; }
+}
+
+/* toast */
+.toast {
+  position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+  transform: translate(-50%, 12px);
+  background: var(--fg); color: var(--bg);
+  padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 15px;
+  opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .toast, .folder { transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>隨機動作圖片・手機版</h1>
+    <button class="secondary small" id="installBtn" type="button" hidden>📲 安裝到主畫面</button>
+    <div class="lib" id="libBar" hidden>
+      <span id="libInfo"></span>
+      <span id="storeInfo"></span>
+      <button class="link" id="addFolder" type="button">追加匯入資料夾</button>
+      <button class="link" id="addFiles" type="button">追加匯入檔案</button>
+      <button class="link" id="clearLib" type="button">清空</button>
+    </div>
+  </header>
+
+  <section class="connect" id="connect">
+    <pre class="tree">圖片庫/
+├─ 熱身/     (伸展.jpg …、熱身歌.mp3)
+├─ 上半身/   (封面.jpg、伏地挺身.jpg …)
+├─ 加速/
+└─ 音樂/     (01mp3/、02mp3/ …)</pre>
+    <p>把手機裡的圖片庫匯入 App，只要匯入一次，之後打開就有，沒有網路也能用。檔案只存在這支手機裡，不會上傳。</p>
+    <button class="primary" id="importFolder" type="button">📥 匯入資料夾</button>
+    <button class="secondary" id="importFiles" type="button">📥 選檔案匯入</button>
+    <p class="hint">不能選資料夾時用「選檔案匯入」，用檔名開頭分類：圖片取名「分類_名稱.jpg」（例如「熱身_伸展.jpg」、「上半身_胸_伏地挺身.jpg」），音樂取名「01mp3_歌名.mp3」、「熱身_歌名.mp3」。</p>
+    <p class="pick-error" id="pickError" role="alert" hidden></p>
+    <input type="file" id="dirInput" webkitdirectory multiple hidden>
+    <input type="file" id="fileInput" multiple accept="image/*,audio/*,.mp3,.m4a" hidden>
+  </section>
+
+  <section id="folderBox" hidden>
+    <div class="section-head">
+      <h2>資料夾（勾選要抽的子資料夾，點封面整個選或不選）</h2>
+      <div class="head-left">
+        <button class="secondary small" id="selAll" type="button">全選</button>
+        <button class="secondary small" id="selNone" type="button">全不選</button>
+      </div>
+    </div>
+    <div class="folders" id="folders"></div>
+  </section>
+
+  <section class="settings">
+    <div class="field">抽幾張
+      <div class="row">
+        <div class="count" role="group" aria-label="抽幾張">
+          <button type="button" id="drawDown" aria-label="少一張">−</button>
+          <span id="drawLabel" aria-live="polite">5 張</span>
+          <button type="button" id="drawUp" aria-label="多一張">+</button>
+        </div>
+      </div>
+    </div>
+    <div class="field">每張圖片顯示時間
+      <div class="row">
+        <div class="seg" role="group" aria-label="每張圖片顯示時間">
+          <button type="button" id="timeUniform">統一</button>
+          <button type="button" id="timeGroup">跟著節奏組</button>
+        </div>
+        <label class="count" id="uniformBox" for="uniform"><input type="number" inputmode="numeric" id="uniform" min="1" max="3600"><span style="min-width:2em">秒</span></label>
+      </div>
+    </div>
+    <div class="volumes" role="group" aria-label="音量">
+      <div class="vrow">
+        <label for="volume">節拍音量</label>
+        <input type="range" id="volume" min="0" max="100" step="1">
+        <span></span>
+      </div>
+      <div class="vrow" id="musicVolumeField" hidden>
+        <label for="musicVolume">音樂音量</label>
+        <input type="range" id="musicVolume" min="0" max="100" step="1">
+        <span></span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <div class="head-left">
+        <h2>節奏組（BPM）</h2>
+        <div class="count" role="group" aria-label="組數">
+          <button type="button" id="countDown" aria-label="少一組">−</button>
+          <span id="countLabel" aria-live="polite">5 組</span>
+          <button type="button" id="countUp" aria-label="多一組">+</button>
+        </div>
+      </div>
+    </div>
+    <p class="hint" id="hint"></p>
+    <div class="slots" id="slots">
+      <div class="slot segslot" id="warmBox" style="--c: var(--warm)" hidden>
+        <span class="num">🤸 熱身</span>
+        <label class="segsecs" for="warmSecs"><input type="number" inputmode="numeric" id="warmSecs" min="1" max="3600" aria-label="熱身秒數"><span>秒</span></label>
+        <div class="seg mini" role="group" aria-label="熱身">
+          <button type="button" id="warmOn">開</button>
+          <button type="button" id="warmOff">關</button>
+        </div>
+      </div>
+      <div class="slot segslot" id="boostBox" style="--c: var(--boost)" hidden>
+        <span class="num">🔥 加速</span>
+        <label class="segsecs" for="boostSecs"><input type="number" inputmode="numeric" id="boostSecs" min="1" max="3600" aria-label="加速秒數"><span>秒</span></label>
+        <div class="seg mini" role="group" aria-label="加速">
+          <button type="button" id="boostOn">開</button>
+          <button type="button" id="boostOff">關</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="actions">
+      <button class="primary" id="start" type="button">▶ 開始</button>
+      <button class="secondary" id="draw" type="button">🎲 抽動作</button>
+    </div>
+    <p class="total" id="total"></p>
+    <div class="cards" id="cards"></div>
+    <div class="empty" id="empty">選好資料夾後按「🎲 抽動作」</div>
+  </section>
+</div>
+
+<div class="player" id="player" hidden>
+  <div class="p-top">
+    <div class="p-where"><b id="pIdx">1 / 5</b><span id="pSrc"></span></div>
+    <span class="p-song" id="pSong"></span>
+    <div class="p-tools">
+      <button class="icon" id="pFull" type="button" aria-label="全螢幕">⛶</button>
+      <button class="icon" id="pClose" type="button" aria-label="結束">✕</button>
+    </div>
+  </div>
+  <div class="stage">
+    <img id="pImg" alt="" draggable="false">
+    <div class="flash" id="flash"></div>
+    <div class="done" id="pDone" hidden>
+      <h2>全部完成！</h2>
+      <div class="row">
+        <button class="primary" id="pAgain" type="button">再一輪</button>
+        <button class="secondary" id="pBack" type="button">回到列表</button>
+      </div>
+    </div>
+  </div>
+  <div class="p-bottom">
+    <div class="p-tempo">
+      <button class="icon p-step" id="pSlower" type="button" aria-label="BPM 減 10">−</button>
+      <div class="p-bpm" id="pBpm">60</div>
+      <button class="icon p-step" id="pFaster" type="button" aria-label="BPM 加 10">＋</button>
+      <div class="p-meta"><span class="unit" id="pUnit">BPM</span><span id="pPer">每拍 1.00 秒</span></div>
+    </div>
+    <div class="p-ctrl">
+      <button class="icon" id="pPrev" type="button" aria-label="上一個">⏮</button>
+      <button class="play" id="pPlay" type="button" aria-label="暫停">⏸</button>
+      <button class="icon" id="pNext" type="button" aria-label="下一個">⏭</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  const MIN = 10, MAX = 240;
+  const MAX_SLOTS = 20, MAX_DRAW = 50;
+  const DUR_MIN = 1, DUR_MAX = 3600;
+  const DEFAULTS = {
+    bpms: Array.from({ length: MAX_SLOTS }, (_, i) => 60 + i * 10),
+    seconds: Array(MAX_SLOTS).fill(30),
+    count: 5, volume: 80, musicVolume: 60, warm: true, warmSecs: 60, boost: true, boostSecs: 30,
+    draw: 5, timeMode: 'uniform', uniform: 30,
+    off: [], // folder names the user switched off, so newly added folders start switched on
+  };
+  // kept apart from the desktop page (random-images.html) so the two never overwrite each other's settings
+  const STORE_KEY = 'random-cards-mobile-v1';
+  const IMG_RE = /\.(jpe?g|png|webp)$/i;
+  // a picture named 封面 or cover is its folder's cover, never drawn
+  const COVER_RE = /^(封面|cover)\.[^.]+$/i;
+  const AUDIO_RE = /\.(mp3|m4a|aac|wav|ogg|flac)$/i;
+  const LOOSE = '（未分類）';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const $ = id => document.getElementById(id);
+  const clamp = n => Math.min(MAX, Math.max(MIN, Math.round(n)));
+  const clampDur = n => Math.min(DUR_MAX, Math.max(DUR_MIN, Math.round(n)));
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  const byName = (a, b) => a.localeCompare(b, 'zh-Hant', { numeric: true });
+
+  // ---- settings ----
+  let settings = load();
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STORE_KEY));
+      if (s && Array.isArray(s.bpms)) {
+        const pad = (arr, def, fix) => def.map((d, i) => (Array.isArray(arr) && arr[i] != null ? fix(Number(arr[i]) || d) : d));
+        return {
+          bpms: pad(s.bpms, DEFAULTS.bpms, clamp),
+          seconds: pad(s.seconds, DEFAULTS.seconds, clampDur),
+          count: Math.min(MAX_SLOTS, Math.max(1, Number(s.count) || DEFAULTS.count)),
+          volume: Number.isFinite(s.volume) ? s.volume : DEFAULTS.volume,
+          musicVolume: Number.isFinite(s.musicVolume) ? s.musicVolume : DEFAULTS.musicVolume,
+          warm: s.warm !== false,
+          warmSecs: clampDur(Number(s.warmSecs) || DEFAULTS.warmSecs),
+          boost: s.boost !== false,
+          boostSecs: clampDur(Number(s.boostSecs) || DEFAULTS.boostSecs),
+          draw: Math.min(MAX_DRAW, Math.max(1, Number(s.draw) || DEFAULTS.draw)),
+          timeMode: s.timeMode === 'group' ? 'group' : 'uniform',
+          uniform: clampDur(Number(s.uniform) || DEFAULTS.uniform),
+          off: Array.isArray(s.off) ? s.off.filter(x => typeof x === 'string') : [],
+        };
+      }
+    } catch (e) {}
+    return structuredClone(DEFAULTS);
+  }
+  function save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(settings)); } catch (e) {}
+  }
+
+  // ---- image library ----
+  // folders: [{ name, items: [{ name, folder, file?, handle? }] }]
+  let libName = '', folders = [], tracks = [];
+  // pictures and music inside a folder named 熱身 or 加速 are kept apart for the warm-up (first) and speed-up (last)
+  // segments; each plays one picture over its own music, with no beat. clips/tracks come from the scan,
+  // card is what was drawn for this round
+  const SEGS = {
+    warm: { folder: '熱身', icon: '🤸', label: '熱身', where: '所有節奏之前的第一段', clips: [], tracks: [], card: null },
+    boost: { folder: '加速', icon: '🔥', label: '加速', where: '所有節奏之後的最後一段', clips: [], tracks: [], card: null },
+  };
+  const segOf = dirs => Object.keys(SEGS).find(k => dirs.includes(SEGS[k].folder)) || null;
+  // music in a folder named 01mp3 / 02mp3 … (or 第一組 / 第1組 / 1組 …) belongs to that BPM group (1-based);
+  // null when it isn't in one
+  const CN_DIGITS = { 一: 1, 二: 2, 兩: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+  function groupNum(dir) {
+    const mp3 = dir.trim().match(/^0*([0-9]+)\s*[-_ ]?\s*mp3$/i);
+    if (mp3) return Number(mp3[1]) || null;
+    const m = dir.trim().match(/^第?\s*([0-9]+|[一二兩三四五六七八九十]+)\s*組$/);
+    if (!m) return null;
+    const s = m[1];
+    if (/^[0-9]+$/.test(s)) return Number(s);
+    if (!s.includes('十')) return CN_DIGITS[s] || null;
+    const [tens, ones] = s.split('十');
+    return (tens ? CN_DIGITS[tens] : 1) * 10 + (ones ? CN_DIGITS[ones] : 0);
+  }
+  const groupOf = dirs => dirs.map(groupNum).filter(n => n != null).pop() ?? null;
+  const urls = new Map();
+  async function urlOf(item) {
+    if (!urls.has(item)) {
+      const file = item.file || await item.handle.getFile();
+      urls.set(item, URL.createObjectURL(file));
+    }
+    return urls.get(item);
+  }
+  function clearUrls() {
+    urls.forEach(u => URL.revokeObjectURL(u));
+    urls.clear();
+  }
+  function setThumb(img, item) {
+    urlOf(item).then(u => { img.src = u; }).catch(() => {});
+  }
+
+  // the imported pictures and music live in this app's own IndexedDB, so they're there every time without picking
+  // anything again, even offline: 'files' holds { path, blob } with path like "上半身/胸/伏地挺身.jpg", 'kv' small values
+  let dbPromise = null;
+  function openDb() {
+    if (!dbPromise) dbPromise = new Promise((res, rej) => {
+      const req = indexedDB.open('random-cards-mobile', 2);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
+        if (!db.objectStoreNames.contains('files')) db.createObjectStore('files', { keyPath: 'path' });
+      };
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    });
+    return dbPromise;
+  }
+  async function idb(store, mode, fn) {
+    const db = await openDb();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(store, mode);
+      const r = fn(tx.objectStore(store));
+      tx.oncomplete = () => res(r && r.result);
+      tx.onerror = () => rej(tx.error);
+      tx.onabort = () => rej(tx.error);
+    });
+  }
+
+  // the library is a folder tree; node: { name, path, items, children }, path like "上半身/胸".
+  // each picture belongs to the folder it sits in directly, and that folder's path is what gets switched on or off.
+  // audio files anywhere in the library are collected on the root as background music
+  const newNode = (name, path) => ({ name, path, items: [], children: [], pics: [] });
+  const newTree = () => Object.assign(newNode('', ''), { tracks: [], segs: { warm: { clips: [], tracks: [] }, boost: { clips: [], tracks: [] } } });
+  function addEntry(root, name, dirs, src) {
+    const seg = segOf(dirs);
+    if (AUDIO_RE.test(name)) return (seg ? root.segs[seg].tracks : root.tracks).push({ name, folder: dirs.join(' › ') || '圖片庫最外層', group: seg ? null : groupOf(dirs), ...src });
+    if (!IMG_RE.test(name)) return;
+    const isCover = COVER_RE.test(name);
+    if (seg) return isCover ? undefined : root.segs[seg].clips.push({ name, key: SEGS[seg].folder, folder: dirs.join(' › '), ...src });
+    // a cover sitting loose in the library itself has no folder to be the cover of
+    if (isCover && !dirs.length) return;
+    let node = root;
+    dirs.forEach((d, i) => {
+      let next = node.children.find(c => c.name === d);
+      if (!next) node.children.push(next = newNode(d, dirs.slice(0, i + 1).join('/')));
+      node = next;
+    });
+    if (isCover) return node.pics.push({ name, ...src });
+    node.items.push({ name, key: node.path || LOOSE, folder: dirs.join(' › ') || LOOSE, ...src });
+  }
+  function treeFromRecords(records) {
+    const tree = newTree();
+    for (const r of records) {
+      const parts = r.path.split('/');
+      addEntry(tree, parts.pop(), parts, { file: r.blob });
+    }
+    return tree;
+  }
+  function setLibrary(name, tree, quiet) {
+    $('pickError').hidden = true;
+    clearUrls();
+    libName = name;
+    const tidy = n => {
+      n.items.sort((a, b) => byName(a.name, b.name));
+      n.cover = n.pics.sort((a, b) => byName(a.name, b.name))[0] || null;
+      n.children.sort((a, b) => byName(a.name, b.name)).forEach(tidy);
+      return n;
+    };
+    tidy(tree);
+    // empty folders (no pictures anywhere below) are left out
+    const prune = n => { n.children = n.children.filter(c => prune(c) > 0); return allItems(n).length; };
+    prune(tree);
+    folders = tree.children.slice();
+    if (tree.items.length) folders.push(Object.assign(newNode(LOOSE, LOOSE), { items: tree.items }));
+    tracks = tree.tracks.sort((a, b) => byName(a.name, b.name));
+    for (const [k, s] of Object.entries(SEGS)) {
+      s.clips = tree.segs[k].clips.sort((a, b) => byName(a.name, b.name));
+      s.tracks = tree.segs[k].tracks.sort((a, b) => byName(a.name, b.name));
+      s.card = null;
+    }
+    // drawn cards from an old library point at files that may be gone
+    cards = [];
+    renderFolders();
+    render();
+    const n = folders.reduce((a, f) => a + allItems(f).length, 0);
+    if (!quiet) toast((n ? `讀到 ${folders.length} 個資料夾、${n} 張圖片` : '這個資料夾裡沒有圖片') + (tracks.length ? `、${tracks.length} 首音樂` : '')
+      + Object.values(SEGS).filter(s => s.clips.length)
+        .map(s => `；${s.label} ${s.clips.length} 張圖片` + (s.tracks.length ? `、${s.tracks.length} 首音樂` : '')).join(''));
+  }
+
+  // where an imported file goes. Picked as a folder it keeps its place inside that folder. Picked one by one, the
+  // start of its name says where: 熱身_伸展.jpg → 熱身/伸展.jpg, 上半身_胸_伏地挺身.jpg → 上半身/胸/伏地挺身.jpg.
+  // Song titles often hold "_" themselves, so for music only a first part naming 熱身 / 加速 / a group counts
+  function importPath(file) {
+    const rel = file.webkitRelativePath;
+    if (rel) return rel.split('/').slice(1).join('/');
+    const parts = file.name.split('_').filter(Boolean);
+    if (parts.length < 2) return file.name;
+    if (!AUDIO_RE.test(file.name)) return parts.join('/');
+    const head = parts[0];
+    return segOf([head]) || groupNum(head) != null || /^0*[1-9][0-9]*$/.test(head) ? head + '/' + parts.slice(1).join('_') : file.name;
+  }
+  let importing = false;
+  async function importFiles(list) {
+    const wanted = list.filter(f => IMG_RE.test(f.name) || AUDIO_RE.test(f.name));
+    if (!wanted.length) return toast('沒有找到 jpg／png／webp 圖片或 mp3 音樂');
+    if (importing) return;
+    importing = true;
+    try {
+      const root = (wanted[0].webkitRelativePath || '').split('/')[0];
+      // one file per transaction keeps memory low on a phone; the toast shows how far it is
+      for (let i = 0; i < wanted.length; i++) {
+        const f = wanted[i];
+        await idb('files', 'readwrite', st => st.put({ path: importPath(f), blob: f }));
+        if (i % 3 === 0 || i === wanted.length - 1) toast(`匯入中 ${i + 1} / ${wanted.length}`);
+      }
+      if (root) await idb('kv', 'readwrite', st => st.put(root, 'libName'));
+      // ask the phone not to clear the stored files when space runs low
+      try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch (e) {}
+      await loadLibrary(true);
+      toast(`匯入完成：${wanted.length} 個檔案`);
+    } catch (e) {
+      $('pickError').textContent = `匯入到一半失敗了（${e.name || e}）。可能是手機空間不夠，可以清掉一些再試。`;
+      $('pickError').hidden = false;
+      toast('匯入失敗');
+      await loadLibrary(true);
+    } finally {
+      importing = false;
+    }
+  }
+  async function loadLibrary(quiet) {
+    let records = [];
+    try { records = await idb('files', 'readonly', st => st.getAll()); } catch (e) { toast('讀不到 App 裡存的檔案'); }
+    const name = await idb('kv', 'readonly', st => st.get('libName')).catch(() => '');
+    setLibrary(name || '圖片庫', treeFromRecords(records), quiet);
+    renderStorage();
+  }
+  async function renderStorage() {
+    try {
+      const { usage } = await navigator.storage.estimate();
+      $('storeInfo').textContent = `· 已用 ${Math.round(usage / 1048576)} MB`;
+    } catch (e) { $('storeInfo').textContent = ''; }
+  }
+  const pickInto = id => () => { if (!importing) $(id).click(); };
+  $('importFolder').addEventListener('click', pickInto('dirInput'));
+  $('addFolder').addEventListener('click', pickInto('dirInput'));
+  $('importFiles').addEventListener('click', pickInto('fileInput'));
+  $('addFiles').addEventListener('click', pickInto('fileInput'));
+  ['dirInput', 'fileInput'].forEach(id => $(id).addEventListener('change', e => {
+    const list = [...e.target.files];
+    e.target.value = '';
+    if (list.length) importFiles(list);
+  }));
+  $('clearLib').addEventListener('click', async () => {
+    if (!confirm('要把 App 裡存的圖片和音樂全部刪掉嗎？手機裡原本的檔案不會受影響。')) return;
+    await idb('files', 'readwrite', st => st.clear());
+    await idb('kv', 'readwrite', st => st.delete('libName'));
+    await loadLibrary(true);
+    toast('已清空 App 裡的檔案');
+  });
+
+  // ---- folders view ----
+  function allItems(n) { return [...n.items, ...n.children.flatMap(allItems)]; }
+  // the switch keys under a node: its own path if it holds pictures, plus every subfolder's
+  const keysUnder = n => [...(n.items.length ? [n.path] : []), ...n.children.flatMap(keysUnder)];
+  const keyOn = k => !settings.off.includes(k);
+  const pool = () => folders.flatMap(allItems).filter(it => keyOn(it.key));
+  function stateOf(n) {
+    const ks = keysUnder(n), on = ks.filter(keyOn).length;
+    return on === 0 ? 'false' : on === ks.length ? 'true' : 'mixed';
+  }
+  function setKeys(ks, on) {
+    settings.off = on ? settings.off.filter(k => !ks.includes(k)) : [...new Set([...settings.off, ...ks])];
+    save();
+    folderViews.forEach(update => update());
+    render();
+  }
+  // a partly checked folder becomes fully checked; a fully checked one becomes unchecked
+  const toggle = n => setKeys(keysUnder(n), stateOf(n) !== 'true');
+
+  // each view registers a function that refreshes its checked state in place, so open lists keep their scroll
+  let folderViews = [];
+  // the folder's 封面 picture when it has one, else its first picture
+  function coverEl(n, cls) {
+    const el = Object.assign(document.createElement('img'), { className: cls, alt: '', draggable: false });
+    const pic = n.cover || allItems(n)[0];
+    if (pic) setThumb(el, pic);
+    return el;
+  }
+  function renderFolders() {
+    const box = $('folders');
+    box.textContent = '';
+    folderViews = [];
+    folders.forEach(f => {
+      const el = document.createElement('div');
+      el.className = 'folder';
+      el.innerHTML = `<button class="head" type="button"><span class="tick"></span><span class="meta"><span class="name"></span><span class="n">${allItems(f).length} 張</span></span></button>`;
+      el.querySelector('.name').textContent = f.name;
+      const head = el.querySelector('.head');
+      head.prepend(coverEl(f, 'cover'));
+      head.addEventListener('click', () => toggle(f));
+      folderViews.push(() => {
+        const st = stateOf(f);
+        el.dataset.state = st;
+        head.setAttribute('aria-pressed', st);
+        el.querySelector('.tick').textContent = st === 'mixed' ? '–' : '✓';
+      });
+      if (f.children.length) {
+        const subs = document.createElement('div');
+        subs.className = 'subs';
+        subs.append(...subRows(f, 0));
+        el.appendChild(subs);
+      }
+      box.appendChild(el);
+    });
+    folderViews.forEach(update => update());
+  }
+  // one checkbox per subfolder, indented by depth; a folder holding pictures beside its own subfolders gets an extra row for those
+  function subRows(n, depth) {
+    const rows = [];
+    if (n.items.length && n.children.length) rows.push(subRow(Object.assign(newNode('（這一層的圖片）', n.path), { items: n.items, cover: n.cover }), depth));
+    n.children.forEach(c => {
+      rows.push(subRow(c, depth));
+      if (c.children.length) rows.push(...subRows(c, depth + 1));
+    });
+    return rows;
+  }
+  function subRow(n, depth) {
+    const row = document.createElement('label');
+    row.className = 'sub';
+    row.style.setProperty('--depth', depth);
+    row.innerHTML = `<input type="checkbox"><span class="sname"></span><span class="n">${allItems(n).length}</span>`;
+    row.querySelector('.sname').textContent = n.name;
+    row.querySelector('input').after(coverEl(n, 'thumb'));
+    const box = row.querySelector('input');
+    box.addEventListener('change', () => toggle(n));
+    folderViews.push(() => {
+      const st = stateOf(n);
+      box.checked = st === 'true';
+      box.indeterminate = st === 'mixed';
+    });
+    return row;
+  }
+  const setAll = on => setKeys(folders.flatMap(keysUnder), on);
+  $('selAll').addEventListener('click', () => setAll(true));
+  $('selNone').addEventListener('click', () => setAll(false));
+
+  // ---- drawing ----
+  // cards: [{ clip, g }] where g is the BPM slot the card plays at
+  let cards = [];
+  // a segment card { clip, seg: 'warm' | 'boost' } plays first or last, with its own seconds and no beat
+  const segOn = k => !!SEGS[k].card && settings[k];
+  const withSegs = () => [...(segOn('warm') ? [SEGS.warm.card] : []), ...cards, ...(segOn('boost') ? [SEGS.boost.card] : [])];
+  const slotColor = c => c.seg ? `var(--${c.seg})` : `var(--p${c.g % 5 + 1})`;
+  const slotInk = c => c.seg ? `var(--${c.seg}-ink)` : `var(--ink${c.g % 5 + 1})`;
+  // 0 = no beat
+  const bpmOf = c => c.seg ? 0 : settings.bpms[c.g];
+  function drawSeg(k) {
+    const s = SEGS[k];
+    s.card = s.clips.length ? { clip: pick(s.clips), seg: k } : null;
+  }
+  function redrawSeg(k) {
+    const s = SEGS[k];
+    const rest = s.clips.filter(c => !s.card || c !== s.card.clip);
+    if (!rest.length) return toast(`「${s.folder}」裡沒有其他圖片可以換了`);
+    // the new picture keeps the song the old one had
+    s.card = { clip: pick(rest), seg: k, song: s.card ? s.card.song : null };
+    if (!s.card.song) s.card.song = songForCard(s.card);
+    render();
+  }
+  // the tempo belongs to the position: the 1st card gets slot 1, the 2nd slot 2 …, wrapping round
+  function reassignAll() {
+    cards.forEach((c, i) => { c.g = i % settings.count; });
+    // a card that moved to another group swaps its song for one from that group's folder;
+    // release all the songs that no longer fit first, so the new picks can use them
+    const moved = cards.filter(c => c.song && !poolFor(c).includes(c.song));
+    moved.forEach(c => { c.song = null; });
+    moved.forEach(c => { c.song = songForCard(c); });
+  }
+  function drawAll() {
+    const all = pool().slice();
+    if (!all.length) return toast(folders.length ? '先選至少一個資料夾' : '先選擇圖片庫');
+    const n = Math.min(settings.draw, all.length);
+    // partial Fisher–Yates: no picture twice in one round
+    for (let i = 0; i < n; i++) {
+      const j = i + Math.floor(Math.random() * (all.length - i));
+      [all[i], all[j]] = [all[j], all[i]];
+    }
+    cards = all.slice(0, n).map(clip => ({ clip, g: 0 }));
+    reassignAll();
+    Object.keys(SEGS).forEach(drawSeg);
+    // one song per card, drawn one after another so they differ while there are enough to go round
+    allDrawn().forEach(c => { c.song = songForCard(c); });
+    if (n < settings.draw) toast(`圖片只有 ${n} 張，全部抽出來了`);
+    render();
+  }
+  function redrawOne(i) {
+    const used = new Set(cards.map(c => c.clip));
+    const rest = pool().filter(clip => !used.has(clip));
+    if (!rest.length) return toast('沒有其他圖片可以換了');
+    cards[i].clip = pick(rest);
+    render();
+  }
+  $('draw').addEventListener('click', drawAll);
+
+  // ---- background music: every card carries its own song, drawn with the pictures;
+  // when a song ends before its card does, another random one from the same pool follows ----
+  let nowPlaying = null;
+  const music = new Audio();
+  function nextSong(avoid, list = tracks) {
+    const rest = list.filter(t => t !== avoid);
+    return rest.length ? pick(rest) : list[0] || null;
+  }
+  // the songs a card draws from: 熱身 / 加速 use their folders; a regular card uses its BPM group's folder (01mp3 …).
+  // Otherwise only music that isn't in any group folder — never another group's folder, so with neither there's no song
+  function poolFor(c) {
+    if (!c) return tracks;
+    const loose = tracks.filter(t => t.group == null);
+    if (c.seg) return SEGS[c.seg].tracks.length ? SEGS[c.seg].tracks : loose;
+    const own = tracks.filter(t => t.group === c.g + 1);
+    return own.length ? own : loose;
+  }
+  const allDrawn = () => [SEGS.warm.card, ...cards, SEGS.boost.card].filter(Boolean);
+  function songForCard(c) {
+    const list = poolFor(c);
+    const taken = new Set(allDrawn().filter(x => x !== c).map(x => x.song));
+    const fresh = list.filter(t => !taken.has(t) && t !== c.song);
+    return fresh.length ? pick(fresh) : nextSong(c.song, list);
+  }
+  const songPool = () => poolFor(playList[at]);
+  function applyMusicVolume() { music.volume = Math.pow(settings.musicVolume / 100, 2); }
+  async function playSong(t) {
+    nowPlaying = t;
+    renderPlayer();
+    if (!t) return music.pause();
+    try { music.src = await urlOf(t); } catch (e) { return toast('讀不到這首歌'); }
+    if (playing) music.play().catch(() => {});
+  }
+  // a file that won't play is skipped; give up once every song has failed in a row
+  let badSongs = 0;
+  music.addEventListener('ended', () => {
+    const c = playList[at];
+    if (c && c.seg === 'boost' && songPool().length) {
+      boostSeen.songs.add(nowPlaying);
+      playSong(freshPick(songPool(), boostSeen.songs, nowPlaying));
+    } else playSong(nextSong(nowPlaying, songPool()));
+  });
+  music.addEventListener('playing', () => { badSongs = 0; });
+  music.addEventListener('error', () => {
+    if (!nowPlaying || !music.getAttribute('src')) return;
+    if (++badSongs >= songPool().length) return toast('音樂檔都沒辦法播放');
+    toast('「' + songName(nowPlaying) + '」沒辦法播放，換下一首');
+    playSong(nextSong(nowPlaying, songPool()));
+  });
+  const songName = t => t.name.replace(AUDIO_RE, '');
+
+  const cardSecs = c => c.seg ? settings[c.seg + 'Secs'] : settings.timeMode === 'group' ? settings.seconds[c.g] : settings.uniform;
+  const fmtSecs = s => {
+    const m = Math.floor(s / 60), r = s % 60;
+    return [m ? m + ' 分' : '', r || !m ? r + ' 秒' : ''].filter(Boolean).join(' ');
+  };
+
+  // ---- audio ----
+  let ctx = null, master = null;
+  function ensureAudio() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      master = ctx.createGain();
+      master.connect(ctx.destination);
+      applyVolume();
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+  }
+  function applyVolume() {
+    if (master) master.gain.value = Math.pow(settings.volume / 100, 2) * 0.9;
+  }
+  // low thump + short wooden tick (same sound as the squat tempo page)
+  function click(t) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(170, t);
+    o.frequency.exponentialRampToValueAtTime(55, t + 0.13);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(1, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.17);
+    o.connect(g).connect(master);
+    o.start(t); o.stop(t + 0.2);
+
+    const o2 = ctx.createOscillator(), g2 = ctx.createGain();
+    o2.type = 'triangle';
+    o2.frequency.setValueAtTime(1250, t);
+    g2.gain.setValueAtTime(0.0001, t);
+    g2.gain.exponentialRampToValueAtTime(0.45, t + 0.002);
+    g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+    o2.connect(g2).connect(master);
+    o2.start(t); o2.stop(t + 0.06);
+  }
+  function tones(t, notes) {
+    notes.forEach(([f, d, len]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t + d);
+      g.gain.exponentialRampToValueAtTime(0.5, t + d + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d + len);
+      o.connect(g).connect(master);
+      o.start(t + d); o.stop(t + d + len + 0.02);
+    });
+  }
+  // two rising tones = next card; three = all done
+  const chime = t => tones(t, [[784, 0, .3], [1175, .13, .3]]);
+  const fanfare = t => tones(t, [[784, 0, .3], [988, .16, .3], [1175, .32, .7]]);
+
+  // ---- playback ----
+  let at = 0, playing = false, finished = false, remaining = 0, timer = null, lastTick = 0, nextBeat = 0;
+  const beatQueue = [];
+  let playList = [];
+  const cur = () => playList[at];
+  const bpm = () => bpmOf(cur());
+  const total = () => cardSecs(cur()) * 1000;
+
+  function tick() {
+    const now = performance.now();
+    remaining -= now - lastTick;
+    lastTick = now;
+    if (remaining <= 0) {
+      if (at < playList.length - 1) goTo(at + 1, true);
+      else if (cur().seg === 'boost') nextBoost();
+      else return finish();
+    }
+    // background tabs throttle timers to ~1s, so schedule further ahead there
+    const ahead = document.hidden ? 1.6 : 0.12;
+    const b = bpm();
+    while (b && nextBeat < ctx.currentTime + ahead) {
+      click(nextBeat);
+      beatQueue.push(nextBeat);
+      nextBeat += 60 / b;
+    }
+    if (document.hidden) beatQueue.length = 0;
+  }
+  function resume() {
+    ensureAudio();
+    playing = true;
+    lastTick = performance.now();
+    // first beat comes after a short breath so you can get into position
+    if (bpm()) nextBeat = Math.max(nextBeat, ctx.currentTime + Math.max(0.3, 30 / bpm()));
+    clearInterval(timer);
+    timer = setInterval(tick, 25);
+    tick();
+    if (nowPlaying && music.src) music.play().catch(() => {});
+    requestWake();
+    renderPlayer();
+  }
+  function pause() {
+    playing = false;
+    clearInterval(timer);
+    music.pause();
+    beatQueue.length = 0;
+    releaseWake();
+    renderPlayer();
+  }
+  function goTo(i, auto) {
+    const old = cur(), oldBpm = bpm();
+    at = i;
+    remaining = total();
+    if (playing) {
+      chime(ctx.currentTime + 0.02);
+      // keep the beat flowing from one tempo to the next; coming out of a segment, start after a short breath
+      nextBeat = oldBpm && bpm()
+        ? Math.max(ctx.currentTime + 0.4, nextBeat - 60 / oldBpm + 60 / bpm())
+        : ctx.currentTime + Math.max(0.4, bpm() ? 30 / bpm() : 0);
+    }
+    // each card has its own song; keep playing if the next card happens to share it
+    const want = cur().song || nextSong(null, songPool());
+    if (want !== nowPlaying) playSong(want);
+    showCard();
+  }
+  // the speed-up segment keeps going until stopped: each time its seconds run out (or on ⏭ / Space)
+  // another 加速 picture and song come in, none repeated until every one has played, never the same twice running
+  let boostSeen = { clips: new Set(), songs: new Set() }, boostRound = 1;
+  function freshPick(list, seen, avoid) {
+    let rest = list.filter(x => !seen.has(x));
+    if (!rest.length) {
+      seen.clear();
+      rest = list.filter(x => x !== avoid);
+      if (!rest.length) rest = list;
+    }
+    const x = pick(rest);
+    seen.add(x);
+    return x;
+  }
+  function nextBoost() {
+    const c = cur(), pool = poolFor(c);
+    boostSeen.clips.add(c.clip);
+    if (c.song) boostSeen.songs.add(c.song);
+    const song = pool.length ? freshPick(pool, boostSeen.songs, nowPlaying) : null;
+    playList[at] = { clip: freshPick(SEGS.boost.clips, boostSeen.clips, c.clip), seg: 'boost', song };
+    boostRound++;
+    remaining = total();
+    if (playing) chime(ctx.currentTime + 0.02);
+    if (song && song !== nowPlaying) playSong(song);
+    showCard();
+  }
+  // ⏭, → and Space: the next card, a fresh 加速 picture while in that segment, or the end of the round
+  function skipNext() {
+    if (finished) return;
+    if (at < playList.length - 1) goTo(at + 1, false);
+    else if (cur().seg === 'boost') nextBoost();
+    else finish();
+  }
+  // ⏮, ← and the right mouse button: back one card
+  function skipPrev() {
+    if (finished) return;
+    if (at > 0) goTo(at - 1, false);
+    else toast('已經是第一個了');
+  }
+  const touchScreen = window.matchMedia('(pointer: coarse)').matches;
+  function openPlayer() {
+    if (!cards.length) return toast('先按「🎲 抽動作」');
+    if (touchScreen) setTimeout(() => toast('點一下：下一張・左右滑：換張・上下滑：BPM'), 300);
+    playList = withSegs();
+    boostSeen = { clips: new Set(), songs: new Set() };
+    boostRound = 1;
+    at = 0;
+    finished = false;
+    remaining = total();
+    nextBeat = 0;
+    $('player').hidden = false;
+    // drop last round's song so resume() doesn't pick it up before the drawn one loads
+    music.pause();
+    music.removeAttribute('src');
+    nowPlaying = null;
+    showCard();
+    resume();
+    playSong(playList[0].song || nextSong(null, poolFor(playList[0])));
+  }
+  function finish() {
+    pause();
+    fanfare(ctx.currentTime + 0.05);
+    finished = true;
+    remaining = 0;
+    renderPlayer();
+  }
+  function closePlayer() {
+    pause();
+    $('player').hidden = true;
+    $('pImg').removeAttribute('src');
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }
+  async function showCard() {
+    const c = cur();
+    document.documentElement.style.setProperty('--active', slotColor(c));
+    renderPlayer();
+    let u;
+    try { u = await urlOf(c.clip); } catch (e) { return toast('讀不到這張圖片，可能被移走了'); }
+    // skip if the player moved on while the file was opening
+    if (cur() !== c || $('player').hidden) return;
+    $('pImg').src = u;
+  }
+
+  $('start').addEventListener('click', openPlayer);
+  $('pPlay').addEventListener('click', () => { if (cur()) playing ? pause() : resume(); });
+  $('pPrev').addEventListener('click', skipPrev);
+  // the right mouse button goes back one, instead of opening the browser's menu
+  $('player').addEventListener('contextmenu', e => {
+    e.preventDefault();
+    skipPrev();
+  });
+  $('pNext').addEventListener('click', skipNext);
+  // a left click anywhere on the playback screen does what Space does; the buttons keep their own jobs
+  $('player').addEventListener('click', e => {
+    if (swiped) { swiped = false; return; }
+    if (e.button === 0 && !e.target.closest('button')) skipNext();
+  });
+  // changes the current card's BPM group by step; 熱身 / 加速 have no beat
+  function bumpBpm(step) {
+    if (finished) return;
+    const c = cur();
+    if (c.seg) return toast(`${SEGS[c.seg].label}段不打節拍`);
+    const before = settings.bpms[c.g];
+    setBpm(c.g, before + step, true);
+    renderPlayer();
+    const now = settings.bpms[c.g];
+    toast(now === before ? `已經是${step > 0 ? '最快' : '最慢'} ${now} BPM` : `${step > 0 ? '▲' : '▼'} ${now} BPM`);
+  }
+  $('pFaster').addEventListener('click', () => bumpBpm(10));
+  $('pSlower').addEventListener('click', () => bumpBpm(-10));
+  // touch: a tap is the click above (next); a swipe left / right goes next / back, and up / down is BPM ±10.
+  // a swipe can be followed by a click on some devices, which must not skip again
+  let swipeStart = null, swiped = false, swipedTimer = null;
+  $('player').addEventListener('pointerdown', e => {
+    swipeStart = e.target.closest('button') ? null : { x: e.clientX, y: e.clientY };
+  });
+  $('player').addEventListener('pointercancel', () => { swipeStart = null; });
+  $('player').addEventListener('pointerup', e => {
+    if (!swipeStart) return;
+    const dx = e.clientX - swipeStart.x, dy = e.clientY - swipeStart.y;
+    swipeStart = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 40) return;
+    swiped = true;
+    clearTimeout(swipedTimer);
+    swipedTimer = setTimeout(() => { swiped = false; }, 400);
+    if (Math.abs(dx) > Math.abs(dy)) (dx < 0 ? skipNext : skipPrev)();
+    else bumpBpm(dy < 0 ? 10 : -10);
+  });
+  // the mouse wheel changes the current card's BPM group by 10: down is faster, up is slower.
+  // a wheel notch is ~100px of delta; trackpads send many small deltas, so they add up to a step first
+  let wheelSum = 0;
+  $('player').addEventListener('wheel', e => {
+    e.preventDefault();
+    if (finished || cur().seg) return finished ? undefined : bumpBpm(0);
+    wheelSum += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
+    if (Math.abs(wheelSum) < 50) return;
+    const step = wheelSum > 0 ? 10 : -10;
+    wheelSum = 0;
+    bumpBpm(step);
+  }, { passive: false });
+  $('pClose').addEventListener('click', closePlayer);
+  $('pBack').addEventListener('click', closePlayer);
+  $('pAgain').addEventListener('click', openPlayer);
+  $('pFull').addEventListener('click', () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else $('player').requestFullscreen().catch(() => {});
+  });
+  const inField = e => e.target instanceof Element && !!e.target.closest('input');
+  document.addEventListener('keydown', e => {
+    if ($('player').hidden || inField(e)) return;
+    // Space always skips to the next picture, even with a button focused (pausing is the ⏸ button)
+    if (e.key === ' ') { e.preventDefault(); if (!e.repeat) skipNext(); }
+    else if (e.key === 'ArrowRight') skipNext();
+    else if (e.key === 'ArrowLeft') skipPrev();
+    else if (e.key === 'Escape' && !document.fullscreenElement) closePlayer();
+  });
+
+  // stop a focused button from also firing on Space, which browsers do on key release
+  document.addEventListener('keyup', e => {
+    if (e.key === ' ' && !$('player').hidden && !inField(e)) e.preventDefault();
+  });
+
+  // ---- wake lock: keep the screen on while training ----
+  let wake = null;
+  async function requestWake() {
+    try { if ('wakeLock' in navigator) wake = await navigator.wakeLock.request('screen'); } catch (e) {}
+  }
+  function releaseWake() {
+    try { wake && wake.release(); } catch (e) {}
+    wake = null;
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (playing && !document.hidden) requestWake();
+  });
+
+  // ---- BPM slots ----
+  const slotsEl = $('slots');
+  const slotEls = settings.bpms.map((_, i) => {
+    const el = document.createElement('div');
+    el.className = 'slot';
+    el.style.setProperty('--c', `var(--p${i % 5 + 1})`);
+    el.innerHTML = `
+      <span class="num">第 ${i + 1} 組</span>
+      <button class="step" type="button" data-d="1" aria-label="第 ${i + 1} 組加 1">+</button>
+      <input type="number" inputmode="numeric" min="${MIN}" max="${MAX}" aria-label="第 ${i + 1} 組 BPM">
+      <button class="step" type="button" data-d="-1" aria-label="第 ${i + 1} 組減 1">−</button>
+      <label class="dur"><input type="number" inputmode="numeric" min="${DUR_MIN}" max="${DUR_MAX}" step="1" aria-label="第 ${i + 1} 組秒數"><span>秒</span></label>`;
+    slotsEl.appendChild(el);
+
+    const input = el.querySelector('input');
+    input.value = settings.bpms[i];
+    input.addEventListener('input', () => {
+      const n = Number(input.value);
+      if (input.value !== '' && n >= MIN && n <= MAX) setBpm(i, n, false);
+    });
+    input.addEventListener('change', () => setBpm(i, Number(input.value) || settings.bpms[i], true));
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
+
+    const durInput = el.querySelector('.dur input');
+    durInput.value = settings.seconds[i];
+    durInput.addEventListener('change', () => {
+      settings.seconds[i] = clampDur(Number(durInput.value) || settings.seconds[i]);
+      durInput.value = settings.seconds[i];
+      save();
+      render();
+    });
+    durInput.addEventListener('keydown', e => { if (e.key === 'Enter') durInput.blur(); });
+
+    el.querySelectorAll('.step').forEach(btn => {
+      const d = Number(btn.dataset.d);
+      let hold = null, rep = null;
+      const stop = () => { clearTimeout(hold); clearInterval(rep); };
+      btn.addEventListener('pointerdown', e => {
+        if (e.button !== 0) return;
+        setBpm(i, settings.bpms[i] + d, true);
+        hold = setTimeout(() => { rep = setInterval(() => setBpm(i, settings.bpms[i] + d, true), 70); }, 400);
+      });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, stop));
+      btn.addEventListener('click', e => { if (e.detail === 0) setBpm(i, settings.bpms[i] + d, true); });
+    });
+    return el;
+  });
+  // the speed-up card goes after the last BPM slot
+  slotsEl.appendChild($('boostBox'));
+  function setBpm(i, n, writeBack) {
+    settings.bpms[i] = clamp(n);
+    if (writeBack) slotEls[i].querySelector('input').value = settings.bpms[i];
+    save();
+    render();
+  }
+  function setCount(n) {
+    n = Math.min(MAX_SLOTS, Math.max(1, n));
+    if (n === settings.count) return;
+    settings.count = n;
+    save();
+    reassignAll();
+    render();
+  }
+  $('countDown').addEventListener('click', () => setCount(settings.count - 1));
+  $('countUp').addEventListener('click', () => setCount(settings.count + 1));
+
+  // ---- draw settings ----
+  function setDraw(n) {
+    settings.draw = Math.min(MAX_DRAW, Math.max(1, n));
+    save();
+    render();
+  }
+  $('drawDown').addEventListener('click', () => setDraw(settings.draw - 1));
+  $('drawUp').addEventListener('click', () => setDraw(settings.draw + 1));
+  const setTimeMode = m => { settings.timeMode = m; save(); render(); };
+  $('timeUniform').addEventListener('click', () => setTimeMode('uniform'));
+  $('timeGroup').addEventListener('click', () => setTimeMode('group'));
+  $('uniform').value = settings.uniform;
+  $('uniform').addEventListener('change', e => {
+    settings.uniform = clampDur(Number(e.target.value) || settings.uniform);
+    e.target.value = settings.uniform;
+    save();
+    render();
+  });
+  $('uniform').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
+  $('musicVolume').value = settings.musicVolume;
+  applyMusicVolume();
+  $('musicVolume').addEventListener('input', e => {
+    settings.musicVolume = Number(e.target.value);
+    applyMusicVolume();
+    save();
+  });
+  $('pImg').addEventListener('error', () => {
+    if ($('pImg').getAttribute('src')) toast('這張圖片打不開，可能壞掉了或不是 jpg／png／webp');
+  });
+  Object.keys(SEGS).forEach(k => {
+    const secs = $(k + 'Secs'), key = k + 'Secs';
+    secs.value = settings[key];
+    secs.addEventListener('change', () => {
+      settings[key] = clampDur(Number(secs.value) || settings[key]);
+      secs.value = settings[key];
+      save();
+      render();
+    });
+    secs.addEventListener('keydown', e => { if (e.key === 'Enter') secs.blur(); });
+    $(k + 'On').addEventListener('click', () => { settings[k] = true; save(); render(); });
+    $(k + 'Off').addEventListener('click', () => { settings[k] = false; save(); render(); });
+  });
+  $('volume').value = settings.volume;
+  $('volume').addEventListener('input', e => {
+    settings.volume = Number(e.target.value);
+    applyVolume();
+    save();
+  });
+
+  // ---- view ----
+  function render() {
+    const hasLib = folders.length > 0;
+    $('connect').hidden = hasLib;
+    $('folderBox').hidden = !hasLib;
+    $('libBar').hidden = !hasLib;
+    const p = pool();
+    if (hasLib) {
+      const all = folders.reduce((a, f) => a + allItems(f).length, 0);
+      $('libInfo').innerHTML = '';
+      $('libInfo').append('圖片庫：', Object.assign(document.createElement('b'), { textContent: libName }),
+        ` · ${folders.length} 個資料夾 · ${all} 張圖片 · 已選 ${p.length} 張`);
+    }
+
+    $('drawLabel').textContent = settings.draw + ' 張';
+    $('drawDown').disabled = settings.draw <= 1;
+    $('drawUp').disabled = settings.draw >= MAX_DRAW;
+    const group = settings.timeMode === 'group';
+    $('timeUniform').setAttribute('aria-pressed', String(!group));
+    $('timeGroup').setAttribute('aria-pressed', String(group));
+    $('uniformBox').hidden = group;
+
+    $('hint').textContent = '第 1 張圖片用第 1 組、第 2 個用第 2 組…，組用完再從第 1 組開始'
+      + (group ? '；每張圖片顯示的秒數看它分到的那一組' : '');
+    const n = settings.count;
+    $('countLabel').textContent = n + ' 組';
+    $('countDown').disabled = n <= 1;
+    $('countUp').disabled = n >= MAX_SLOTS;
+    // the warm-up and speed-up cards share the row with the groups
+    const all = n + Object.values(SEGS).filter(s => s.clips.length).length;
+    slotsEl.style.setProperty('--cols', all <= 7 ? Math.max(3, all) : Math.min(7, Math.ceil(all / 2)));
+    slotEls.forEach((el, i) => {
+      el.hidden = i >= n;
+      el.querySelector('.dur').hidden = !group;
+    });
+
+    $('musicVolumeField').hidden = !tracks.length && !Object.values(SEGS).some(s => s.tracks.length);
+
+    $('draw').textContent = cards.length ? '🎲 全部重抽' : '🎲 抽動作';
+    $('draw').disabled = !p.length;
+    $('start').disabled = !cards.length;
+    for (const [k, s] of Object.entries(SEGS)) {
+      $(k + 'Box').hidden = !s.clips.length;
+      $(k + 'On').setAttribute('aria-pressed', String(settings[k]));
+      $(k + 'Off').setAttribute('aria-pressed', String(!settings[k]));
+      $(k + 'Box').classList.toggle('off', !settings[k]);
+    }
+    const extras = Object.keys(SEGS).filter(segOn).map(k => ' ＋ ' + SEGS[k].label).join('');
+    $('total').textContent = cards.length
+      ? `共 ${cards.length} 個${extras} · 全程 ${fmtSecs(withSegs().reduce((a, c) => a + cardSecs(c), 0))}` + (cards.length > 1 ? ' · 拖曳卡片可以調整順序' : '')
+      : '';
+    renderCards();
+  }
+
+  function renderCards() {
+    const box = $('cards');
+    box.textContent = '';
+    $('empty').hidden = cards.length > 0;
+    if (cards.length && segOn('warm')) box.appendChild(segCardEl('warm'));
+    cards.forEach((c, i) => {
+      const el = document.createElement('div');
+      el.className = 'card';
+      el.style.setProperty('--c', slotColor(c));
+      el.style.setProperty('--ink', slotInk(c));
+      el.dataset.i = i;
+      el.innerHTML = `<img alt="" draggable="false"><button class="idx" type="button" aria-label="第 ${i + 1} 個，拖曳或按左右方向鍵調整順序" title="拖曳調整順序">${i + 1}</button>
+        <button class="re" type="button" aria-label="換掉第 ${i + 1} 個" title="只換這一個">🔄</button>
+        <div class="info"><span class="src"></span><span class="chip">${bpmOf(c)} BPM · ${cardSecs(c)}s</span></div>`;
+      el.querySelector('.src').textContent = c.clip.folder;
+      el.title = c.clip.name;
+      setThumb(el.querySelector('img'), c.clip);
+      el.querySelector('.re').addEventListener('click', () => redrawOne(i));
+      el.querySelector('.idx').addEventListener('keydown', e => {
+        const d = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[e.key];
+        if (!d || i + d < 0 || i + d >= cards.length) return;
+        e.preventDefault();
+        const order = cards.map((_, k) => k);
+        [order[i], order[i + d]] = [order[i + d], order[i]];
+        applyOrder(order);
+        box.querySelectorAll('.card:not(.seg)')[i + d].querySelector('.idx').focus();
+      });
+      const tune = tuneEl(c, () => redrawOne(i));
+      if (tune) el.appendChild(tune);
+      el.addEventListener('pointerdown', e => startDrag(e, el));
+      box.appendChild(el);
+    });
+    if (cards.length && segOn('boost')) box.appendChild(segCardEl('boost'));
+  }
+  // segment cards sit before / after the others and can't be dragged; 🔄 swaps in another picture from that folder
+  function segCardEl(k) {
+    const s = SEGS[k], c = s.card;
+    const el = document.createElement('div');
+    el.className = 'card seg';
+    el.style.setProperty('--c', slotColor(c));
+    el.style.setProperty('--ink', slotInk(c));
+    el.innerHTML = `<img alt="" draggable="false"><span class="idx">${s.icon} ${s.label}</span>
+      <button class="re" type="button" aria-label="換掉${s.label}圖片" title="換一個${s.label}圖片">🔄</button>
+      <div class="info"><span class="src"></span><span class="chip">不打節拍 · ${cardSecs(c)}s</span></div>`;
+    el.querySelector('.src').textContent = c.clip.folder;
+    el.title = c.clip.name;
+    setThumb(el.querySelector('img'), c.clip);
+    el.querySelector('.re').addEventListener('click', () => redrawSeg(k));
+    const tune = tuneEl(c, () => redrawSeg(k));
+    if (tune) el.appendChild(tune);
+    return el;
+  }
+  // the card's song as a marquee, with 🔄 below swapping it for another from the same pool
+  // under each card: its song as a marquee with 🔄 to swap the song, then 🎲 to redraw just this card's movement
+  function tuneEl(c, redraw) {
+    const wrap = document.createElement('div');
+    wrap.className = 'tune';
+    if (c.song) {
+      wrap.innerHTML = '<div class="marquee"><span></span></div><button class="secondary small tune-re song-re" type="button">🔄 換歌</button>';
+      const text = wrap.querySelector('.marquee span');
+      text.textContent = '🎶 ' + songName(c.song);
+      wrap.querySelector('.marquee').title = c.song.name;
+      // longer names scroll for longer so the speed stays readable
+      text.style.setProperty('--dur', Math.max(6, text.textContent.length * 0.3) + 's');
+      const btn = wrap.querySelector('.song-re');
+      btn.disabled = poolFor(c).length < 2;
+      btn.addEventListener('click', () => { c.song = songForCard(c); render(); });
+    } else wrap.classList.add('no-song');
+    const again = Object.assign(document.createElement('button'), { type: 'button', className: 'secondary small tune-re', textContent: '🎲 換動作' });
+    again.title = '只重抽這一個動作，歌不變';
+    again.addEventListener('click', redraw);
+    wrap.appendChild(again);
+    return wrap;
+  }
+
+  // ---- reorder by dragging: the card follows the pointer and the others shift around it live ----
+  function startDrag(e, el) {
+    if (e.button !== 0 || e.target.closest('.re, .tune')) return;
+    if (e.pointerType === 'touch' && !e.target.closest('.idx')) return;
+    const box = $('cards');
+    const movable = () => [...box.querySelectorAll('.card:not(.seg)')];
+    const r0 = el.getBoundingClientRect();
+    const grabX = e.clientX - r0.left, grabY = e.clientY - r0.top;
+    const sx = e.clientX, sy = e.clientY;
+    let dragging = false;
+    el.setPointerCapture(e.pointerId);
+    const place = ev => {
+      el.style.transform = '';
+      const r = el.getBoundingClientRect();
+      el.style.transform = `translate(${ev.clientX - grabX - r.left}px, ${ev.clientY - grabY - r.top}px)`;
+    };
+    const move = ev => {
+      if (!dragging) {
+        if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 6) return;
+        dragging = true;
+        el.classList.add('dragging');
+      }
+      const over = movable().find(c => {
+        if (c === el) return false;
+        const r = c.getBoundingClientRect();
+        return ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom;
+      });
+      if (over) {
+        const kids = movable();
+        box.insertBefore(el, kids.indexOf(over) > kids.indexOf(el) ? over.nextSibling : over);
+        movable().forEach((c, k) => { c.querySelector('.idx').textContent = k + 1; });
+      }
+      place(ev);
+    };
+    const end = () => {
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', end);
+      el.removeEventListener('pointercancel', end);
+      el.classList.remove('dragging');
+      el.style.transform = '';
+      if (dragging) applyOrder(movable().map(c => Number(c.dataset.i)));
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+  }
+  // order lists old card indexes in their new positions
+  function applyOrder(order) {
+    if (order.every((k, j) => k === j)) return render();
+    cards = order.map(k => cards[k]);
+    // the tempo belongs to the position, so the moved cards take the tempos of their new places
+    reassignAll();
+    render();
+  }
+
+  const fmt = ms => {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  };
+  function renderPlayer() {
+    if ($('player').hidden) return;
+    const c = cur();
+    const seg = c.seg && SEGS[c.seg];
+    $('pIdx').textContent = seg ? `${seg.icon} ${seg.label}` + (c.seg === 'boost' && boostRound > 1 ? ` #${boostRound}` : '')
+      : `${cards.indexOf(c) + 1} / ${cards.length}`;
+    $('pSrc').textContent = c.clip.folder + ' · ' + c.clip.name.replace(IMG_RE, '');
+    $('pBpm').textContent = seg ? seg.label : bpm();
+    $('pUnit').hidden = !!seg;
+    $('pSlower').hidden = $('pFaster').hidden = !!seg;
+    $('pPer').textContent = seg ? '不打節拍' : '每拍 ' + (60 / bpm()).toFixed(2) + ' 秒';
+    $('pPlay').textContent = playing ? '⏸' : '▶';
+    $('pPlay').setAttribute('aria-label', playing ? '暫停' : '繼續');
+    $('pPrev').disabled = finished || at === 0;
+    $('pNext').disabled = finished || (at === playList.length - 1 && c.seg !== 'boost');
+    $('pPlay').disabled = finished;
+    $('pDone').hidden = !finished;
+    $('pSong').textContent = nowPlaying ? '🎶 ' + songName(nowPlaying) : '';
+  }
+
+  // beat flash on the picture frame, timed against the audio clock
+  const flash = $('flash');
+  function frame() {
+    if (playing && ctx) {
+      const now = ctx.currentTime;
+      while (beatQueue.length && beatQueue[0] <= now) {
+        beatQueue.shift();
+        flash.animate(
+          [{ opacity: reduceMotion ? .5 : 1 }, { opacity: 0 }],
+          { duration: Math.min(320, (60 / (bpm() || 60)) * 700), easing: 'ease-out' }
+        );
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  let toastTimer = null;
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+  }
+
+  // ---- offline app: keep the page on the phone so it opens without internet, and offer to install it ----
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  let installPrompt = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    installPrompt = e;
+    $('installBtn').hidden = false;
+  });
+  $('installBtn').addEventListener('click', async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice.catch(() => {});
+    installPrompt = null;
+    $('installBtn').hidden = true;
+  });
+  window.addEventListener('appinstalled', () => {
+    $('installBtn').hidden = true;
+    toast('已安裝到主畫面');
+  });
+
+  render();
+  loadLibrary(true);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
