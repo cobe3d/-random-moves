@@ -1,6 +1,6 @@
 // Keeps the mobile page and its icons on the phone, so the installed app opens without internet.
 // Bump VERSION whenever random-mobile.html changes, so phones swap in the new copy.
-const VERSION = 'm5-1';
+const VERSION = 'm6-1';
 const FILES = ['./', './index.html', './random-mobile.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

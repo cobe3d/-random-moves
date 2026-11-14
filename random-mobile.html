@@ -409,18 +409,18 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
   </section>
 
   <section class="settings">
-    <div class="field">抽幾張
+    <div class="field">抽幾個
       <div class="row">
-        <div class="count" role="group" aria-label="抽幾張">
+        <div class="count" role="group" aria-label="抽幾個">
           <button type="button" id="drawDown" aria-label="少一張">−</button>
-          <span id="drawLabel" aria-live="polite">5 張</span>
+          <span id="drawLabel" aria-live="polite">5 個</span>
           <button type="button" id="drawUp" aria-label="多一張">+</button>
         </div>
       </div>
     </div>
-    <div class="field">每張圖片顯示時間
+    <div class="field">每個動作顯示時間
       <div class="row">
-        <div class="seg" role="group" aria-label="每張圖片顯示時間">
+        <div class="seg" role="group" aria-label="每個動作顯示時間">
           <button type="button" id="timeUniform">統一</button>
           <button type="button" id="timeGroup">跟著節奏組</button>
         </div>
@@ -677,12 +677,31 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     }
     return tree;
   }
+  // pictures named the same apart from a number at the end (深蹲01.jpg, 深蹲02.jpg, 深蹲-3.jpg …) are one movement
+  // shown frame by frame: the set is drawn as a single item, and while it plays its pictures take turns on the beat.
+  // A picture with the bare name (深蹲.jpg) comes first; a name that is only a number stays on its own
+  const FRAME_RE = /^(.*?)[\s_-]*(\d+)$/;
+  function groupFrames(list) {
+    const sets = new Map();
+    for (const it of list) {
+      const stem = it.name.replace(IMG_RE, '');
+      const m = stem.match(FRAME_RE);
+      const base = m && m[1] ? m[1] : stem;
+      if (!sets.has(base)) sets.set(base, []);
+      sets.get(base).push({ it, num: m && m[1] ? Number(m[2]) : -1 });
+    }
+    return [...sets.entries()].map(([base, fs]) => {
+      fs.sort((a, b) => a.num - b.num || byName(a.it.name, b.it.name));
+      const frames = fs.map(f => f.it);
+      return frames.length === 1 ? frames[0] : { ...frames[0], name: base + frames[0].name.match(IMG_RE)[0], frames };
+    }).sort((a, b) => byName(a.name, b.name));
+  }
   function setLibrary(name, tree, quiet) {
     $('pickError').hidden = true;
     clearUrls();
     libName = name;
     const tidy = n => {
-      n.items.sort((a, b) => byName(a.name, b.name));
+      n.items = groupFrames(n.items);
       n.cover = n.pics.sort((a, b) => byName(a.name, b.name))[0] || null;
       n.children.sort((a, b) => byName(a.name, b.name)).forEach(tidy);
       return n;
@@ -695,7 +714,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     if (tree.items.length) folders.push(Object.assign(newNode(LOOSE, LOOSE), { items: tree.items }));
     tracks = tree.tracks.sort((a, b) => byName(a.name, b.name));
     for (const [k, s] of Object.entries(SEGS)) {
-      s.clips = tree.segs[k].clips.sort((a, b) => byName(a.name, b.name));
+      s.clips = groupFrames(tree.segs[k].clips);
       s.tracks = tree.segs[k].tracks.sort((a, b) => byName(a.name, b.name));
       s.card = null;
     }
@@ -704,9 +723,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     renderFolders();
     render();
     const n = folders.reduce((a, f) => a + allItems(f).length, 0);
-    if (!quiet) toast((n ? `讀到 ${folders.length} 個資料夾、${n} 張圖片` : '這個資料夾裡沒有圖片') + (tracks.length ? `、${tracks.length} 首音樂` : '')
+    if (!quiet) toast((n ? `讀到 ${folders.length} 個資料夾、${n} 個動作` : '這個資料夾裡沒有圖片') + (tracks.length ? `、${tracks.length} 首音樂` : '')
       + Object.values(SEGS).filter(s => s.clips.length)
-        .map(s => `；${s.label} ${s.clips.length} 張圖片` + (s.tracks.length ? `、${s.tracks.length} 首音樂` : '')).join(''));
+        .map(s => `；${s.label} ${s.clips.length} 個動作` + (s.tracks.length ? `、${s.tracks.length} 首音樂` : '')).join(''));
   }
 
   // where an imported file goes. Picked as a folder it keeps its place inside that folder. Picked one by one, the
@@ -815,7 +834,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     folders.forEach(f => {
       const el = document.createElement('div');
       el.className = 'folder';
-      el.innerHTML = `<button class="head" type="button"><span class="tick"></span><span class="meta"><span class="name"></span><span class="n">${allItems(f).length} 張</span></span></button>`;
+      el.innerHTML = `<button class="head" type="button"><span class="tick"></span><span class="meta"><span class="name"></span><span class="n">${allItems(f).length} 個動作</span></span></button>`;
       el.querySelector('.name').textContent = f.name;
       const head = el.querySelector('.head');
       head.prepend(coverEl(f, 'cover'));
@@ -912,7 +931,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     Object.keys(SEGS).forEach(drawSeg);
     // one song per card, drawn one after another so they differ while there are enough to go round
     allDrawn().forEach(c => { c.song = songForCard(c); });
-    if (n < settings.draw) toast(`圖片只有 ${n} 張，全部抽出來了`);
+    if (n < settings.draw) toast(`動作只有 ${n} 個，全部抽出來了`);
     render();
   }
   function redrawOne(i) {
@@ -1168,15 +1187,28 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     $('pImg').removeAttribute('src');
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   }
+  // the pictures of the movement on screen, which one shows, and when it last changed (for the segments without a beat)
+  let frameUrls = [], frameAt = 0, frameSwap = 0, frameImgs = [];
   async function showCard() {
     const c = cur();
     document.documentElement.style.setProperty('--active', slotColor(c));
     renderPlayer();
-    let u;
-    try { u = await urlOf(c.clip); } catch (e) { return toast('讀不到這張圖片，可能被移走了'); }
-    // skip if the player moved on while the file was opening
+    let urls;
+    try { urls = await Promise.all((c.clip.frames || [c.clip]).map(urlOf)); } catch (e) { return toast('讀不到這張圖片，可能被移走了'); }
+    // skip if the player moved on while the files were opening
     if (cur() !== c || $('player').hidden) return;
-    $('pImg').src = u;
+    frameUrls = urls;
+    frameAt = 0;
+    frameSwap = performance.now();
+    // decode every picture of the set up front, so the turns on the beat don't flicker
+    frameImgs = urls.map(u => Object.assign(new Image(), { src: u }));
+    $('pImg').src = urls[0];
+  }
+  function nextFrame() {
+    if (frameUrls.length < 2) return;
+    frameAt = (frameAt + 1) % frameUrls.length;
+    frameSwap = performance.now();
+    $('pImg').src = frameUrls[frameAt];
   }
 
   $('start').addEventListener('click', openPlayer);
@@ -1397,10 +1429,10 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
       const all = folders.reduce((a, f) => a + allItems(f).length, 0);
       $('libInfo').innerHTML = '';
       $('libInfo').append('圖片庫：', Object.assign(document.createElement('b'), { textContent: libName }),
-        ` · ${folders.length} 個資料夾 · ${all} 張圖片 · 已選 ${p.length} 張`);
+        ` · ${folders.length} 個資料夾 · ${all} 個動作 · 已選 ${p.length} 個`);
     }
 
-    $('drawLabel').textContent = settings.draw + ' 張';
+    $('drawLabel').textContent = settings.draw + ' 個';
     $('drawDown').disabled = settings.draw <= 1;
     $('drawUp').disabled = settings.draw >= MAX_DRAW;
     const group = settings.timeMode === 'group';
@@ -1408,8 +1440,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     $('timeGroup').setAttribute('aria-pressed', String(group));
     $('uniformBox').hidden = group;
 
-    $('hint').textContent = '第 1 張圖片用第 1 組、第 2 個用第 2 組…，組用完再從第 1 組開始'
-      + (group ? '；每張圖片顯示的秒數看它分到的那一組' : '');
+    $('hint').textContent = '第 1 個動作用第 1 組、第 2 個用第 2 組…，組用完再從第 1 組開始'
+      + (group ? '；每個動作顯示的秒數看它分到的那一組' : '');
     const n = settings.count;
     $('countLabel').textContent = n + ' 組';
     $('countDown').disabled = n <= 1;
@@ -1440,6 +1472,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     renderCards();
   }
 
+  const frameNote = clip => (clip.frames ? ` · ${clip.frames.length} 張` : '');
   function renderCards() {
     const box = $('cards');
     box.textContent = '';
@@ -1454,7 +1487,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
       el.innerHTML = `<img alt="" draggable="false"><button class="idx" type="button" aria-label="第 ${i + 1} 個，拖曳或按左右方向鍵調整順序" title="拖曳調整順序">${i + 1}</button>
         <button class="re" type="button" aria-label="換掉第 ${i + 1} 個" title="只換這一個">🔄</button>
         <div class="info"><span class="src"></span><span class="chip">${bpmOf(c)} BPM · ${cardSecs(c)}s</span></div>`;
-      el.querySelector('.src').textContent = c.clip.folder;
+      el.querySelector('.src').textContent = c.clip.folder + frameNote(c.clip);
       el.title = c.clip.name;
       setThumb(el.querySelector('img'), c.clip);
       el.querySelector('.re').addEventListener('click', () => redrawOne(i));
@@ -1484,7 +1517,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     el.innerHTML = `<img alt="" draggable="false"><span class="idx">${s.icon} ${s.label}</span>
       <button class="re" type="button" aria-label="換掉${s.label}圖片" title="換一個${s.label}圖片">🔄</button>
       <div class="info"><span class="src"></span><span class="chip">不打節拍 · ${cardSecs(c)}s</span></div>`;
-    el.querySelector('.src').textContent = c.clip.folder;
+    el.querySelector('.src').textContent = c.clip.folder + frameNote(c.clip);
     el.title = c.clip.name;
     setThumb(el.querySelector('img'), c.clip);
     el.querySelector('.re').addEventListener('click', () => redrawSeg(k));
@@ -1580,7 +1613,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     const seg = c.seg && SEGS[c.seg];
     $('pIdx').textContent = seg ? `${seg.icon} ${seg.label}` + (c.seg === 'boost' && boostRound > 1 ? ` #${boostRound}` : '')
       : `${cards.indexOf(c) + 1} / ${cards.length}`;
-    $('pSrc').textContent = c.clip.folder + ' · ' + c.clip.name.replace(IMG_RE, '');
+    $('pSrc').textContent = c.clip.folder + ' · ' + c.clip.name.replace(IMG_RE, '') + frameNote(c.clip);
     $('pBpm').textContent = seg ? seg.label : bpm();
     $('pUnit').hidden = !!seg;
     $('pSlower').hidden = $('pFaster').hidden = !!seg;
@@ -1605,7 +1638,10 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
           [{ opacity: reduceMotion ? .5 : 1 }, { opacity: 0 }],
           { duration: Math.min(320, (60 / (bpm() || 60)) * 700), easing: 'ease-out' }
         );
+        nextFrame();
       }
+      // 熱身 / 加速 have no beat, so a picture set there turns every second
+      if (!bpm() && performance.now() - frameSwap >= 1000) nextFrame();
     }
     requestAnimationFrame(frame);
   }
