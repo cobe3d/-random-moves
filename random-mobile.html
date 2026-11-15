@@ -103,48 +103,32 @@ h1::after { content: "✧"; color: var(--accent); font-size: 14px; font-weight: 
   font-family: ui-monospace, Consolas, monospace; font-size: 13px; text-align: left; white-space: pre; color: var(--muted);
 }
 
-/* folder cards */
-.folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; align-items: start; }
-.folder {
-  display: flex; flex-direction: column;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
-  transition: box-shadow .15s;
+/* folder list: one row per folder with a circle to tap; subfolders indented under their folder.
+   The circle is filled when everything below is on, shows – when only some is, and is empty when none is */
+.folders {
+  display: flex; flex-direction: column; padding: 6px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
 }
-.folder .head {
-  position: relative; display: flex; flex-direction: column; text-align: left; padding: 0; width: 100%;
-  border: 0; background: none; transition: opacity .15s;
+.frow {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; text-align: left;
+  padding: 8px 12px 8px calc(12px + var(--depth, 0) * 26px); border: 0; border-radius: 10px; background: none;
+  font-size: 16px; touch-action: manipulation;
 }
-.folder .cover { aspect-ratio: 4 / 3; width: 100%; object-fit: cover; background: var(--bg); display: block; }
-.folder .meta { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 1px; }
-.folder .name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.folder .n { font-size: 12px; color: var(--muted); }
-.folder .tick {
-  position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%;
-  display: grid; place-items: center; font-size: 15px; font-weight: 700;
-  background: rgb(0 0 0 / .35); color: #fff; border: 2px solid #fff;
+.frow:hover { background: color-mix(in srgb, var(--line) 50%, transparent); }
+.frow.top { font-weight: 700; }
+.frow.top:not(:first-child) { margin-top: 4px; border-top: 1px solid var(--line); border-radius: 0; }
+.dot {
+  width: 24px; height: 24px; flex: none; border-radius: 50%; border: 2px solid var(--muted);
+  display: grid; place-items: center;
 }
-.folder[data-state="true"] { box-shadow: 0 0 0 2.5px var(--accent); border-color: var(--accent); }
-.folder[data-state="mixed"] { box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--accent) 45%, transparent); }
-.folder:not([data-state="false"]) .tick { background: var(--accent); color: var(--on-accent); border-color: var(--on-accent); }
-.folder[data-state="false"] .head { opacity: .5; }
-.folder[data-state="false"] .tick { color: transparent; }
-
-/* subfolder checkboxes inside a folder card */
-.subs {
-  border-top: 1px solid var(--line); padding: 6px; max-height: 260px; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 1px;
-}
-.sub {
-  display: flex; align-items: center; gap: 8px; min-height: 36px;
-  padding: 4px 8px 4px calc(8px + var(--depth, 0) * 18px); border-radius: 8px;
-  font-size: 14px; cursor: pointer;
-}
-.sub:hover { background: color-mix(in srgb, var(--line) 50%, transparent); }
-.sub input { width: 18px; height: 18px; margin: 0; flex: none; accent-color: var(--accent); cursor: pointer; }
-.sub .thumb { width: 64px; height: 48px; flex: none; border-radius: 6px; object-fit: cover; background: var(--bg); display: block; }
-.sub:has(input:not(:checked):not(:indeterminate)) .thumb { opacity: .45; }
-.sub .sname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sub .n { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dot::after { content: ""; }
+.frow[aria-checked="true"] .dot { border-color: var(--accent); background: var(--accent); }
+.frow[aria-checked="true"] .dot::after { width: 8px; height: 8px; border-radius: 50%; background: var(--on-accent); }
+.frow[aria-checked="mixed"] .dot { border-color: var(--accent); }
+.frow[aria-checked="mixed"] .dot::after { width: 10px; height: 3px; border-radius: 2px; background: var(--accent); }
+.frow[aria-checked="false"] .fname { color: var(--muted); }
+.frow .fname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.frow .n { margin-left: auto; flex: none; font-size: 12px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* number stepper */
 .count {
@@ -399,7 +383,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 
   <section id="folderBox" hidden>
     <div class="section-head">
-      <h2>資料夾（勾選要抽的子資料夾，點封面整個選或不選）</h2>
+      <h2>資料夾（點圓圈選擇要抽的資料夾）</h2>
       <div class="head-left">
         <button class="secondary small" id="selAll" type="button">全選</button>
         <button class="secondary small" id="selNone" type="button">全不選</button>
@@ -831,66 +815,35 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 
   // each view registers a function that refreshes its checked state in place, so open lists keep their scroll
   let folderViews = [];
-  // the folder's 封面 picture when it has one, else its first picture
-  function coverEl(n, cls) {
-    const el = Object.assign(document.createElement('img'), { className: cls, alt: '', draggable: false });
-    const pic = n.cover || allItems(n)[0];
-    if (pic) setThumb(el, pic);
-    return el;
+  // one row per folder: a circle to tap, the name and how many movements it holds; the row reads all / some / none
+  function folderRow(n, depth) {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = depth ? 'frow' : 'frow top';
+    row.setAttribute('role', 'checkbox');
+    row.style.setProperty('--depth', depth);
+    row.innerHTML = `<span class="dot" aria-hidden="true"></span><span class="fname"></span><span class="n">${allItems(n).length} 個</span>`;
+    row.querySelector('.fname').textContent = n.name;
+    row.addEventListener('click', () => toggle(n));
+    folderViews.push(() => row.setAttribute('aria-checked', stateOf(n)));
+    return row;
   }
   function renderFolders() {
     const box = $('folders');
     box.textContent = '';
     folderViews = [];
-    folders.forEach(f => {
-      const el = document.createElement('div');
-      el.className = 'folder';
-      el.innerHTML = `<button class="head" type="button"><span class="tick"></span><span class="meta"><span class="name"></span><span class="n">${allItems(f).length} 個動作</span></span></button>`;
-      el.querySelector('.name').textContent = f.name;
-      const head = el.querySelector('.head');
-      head.prepend(coverEl(f, 'cover'));
-      head.addEventListener('click', () => toggle(f));
-      folderViews.push(() => {
-        const st = stateOf(f);
-        el.dataset.state = st;
-        head.setAttribute('aria-pressed', st);
-        el.querySelector('.tick').textContent = st === 'mixed' ? '–' : '✓';
-      });
-      if (f.children.length) {
-        const subs = document.createElement('div');
-        subs.className = 'subs';
-        subs.append(...subRows(f, 0));
-        el.appendChild(subs);
-      }
-      box.appendChild(el);
-    });
+    folders.forEach(f => box.append(folderRow(f, 0), ...subRows(f, 1)));
     folderViews.forEach(update => update());
   }
-  // one checkbox per subfolder, indented by depth; a folder holding pictures beside its own subfolders gets an extra row for those
+  // subfolders, indented by depth; a folder holding pictures beside its own subfolders gets an extra row for those
   function subRows(n, depth) {
     const rows = [];
-    if (n.items.length && n.children.length) rows.push(subRow(Object.assign(newNode('（這一層的圖片）', n.path), { items: n.items, cover: n.cover }), depth));
+    if (n.items.length && n.children.length) rows.push(folderRow(Object.assign(newNode('（這一層的圖片）', n.path), { items: n.items }), depth));
     n.children.forEach(c => {
-      rows.push(subRow(c, depth));
+      rows.push(folderRow(c, depth));
       if (c.children.length) rows.push(...subRows(c, depth + 1));
     });
     return rows;
-  }
-  function subRow(n, depth) {
-    const row = document.createElement('label');
-    row.className = 'sub';
-    row.style.setProperty('--depth', depth);
-    row.innerHTML = `<input type="checkbox"><span class="sname"></span><span class="n">${allItems(n).length}</span>`;
-    row.querySelector('.sname').textContent = n.name;
-    row.querySelector('input').after(coverEl(n, 'thumb'));
-    const box = row.querySelector('input');
-    box.addEventListener('change', () => toggle(n));
-    folderViews.push(() => {
-      const st = stateOf(n);
-      box.checked = st === 'true';
-      box.indeterminate = st === 'mixed';
-    });
-    return row;
   }
   const setAll = on => setKeys(folders.flatMap(keysUnder), on);
   $('selAll').addEventListener('click', () => setAll(true));
