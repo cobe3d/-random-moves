@@ -277,6 +277,22 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
   flex: none; padding: 2px 8px; border-radius: 999px; background: var(--c); color: var(--ink);
   font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
+/* on a phone the drawn cards sit three to a row, so the whole order fits on screen while dragging */
+@media (max-width: 640px) {
+  .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .card { border-top-width: 5px; border-radius: 12px; }
+  .card .idx { top: 6px; left: 5px; min-width: 32px; height: 28px; padding: 0 6px; font-size: 15px; gap: 2px; }
+  .card .idx::before { font-size: 11px; }
+  .card.seg .idx { font-size: 11px; padding: 0 6px; }
+  .card .re { top: 6px; right: 5px; width: 28px; height: 28px; font-size: 13px; }
+  .card .info { flex-direction: column; align-items: flex-start; padding: 6px 7px 7px; gap: 3px; }
+  .card .src { font-size: 11px; max-width: 100%; }
+  .chip { padding: 1px 6px; font-size: 10px; }
+  .marquee { font-size: 11px; padding: 5px 0; }
+  .tune { gap: 5px; padding-bottom: 6px; }
+  .tune.no-song { padding-top: 6px; }
+  .tune .tune-re { margin: 0 5px; min-height: 30px; padding: 0 4px; font-size: 12px; }
+}
 .empty::before { content: ""; display: block; width: 44px; height: 44px; margin: 0 auto 8px; background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><g transform='translate(0,0) scale(1)' opacity='1'><g fill='%23f2a7c3'><circle cx='20' cy='10' r='3.2'/></g><g fill='none' stroke='%23f2a7c3' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'><path d='M20 14 L20 25 M20 16 L11 9 L18 1 M20 16 L29 9 L22 1 M20 25 L20 38 M20 25 L28 30 L21 33'/></g></g></svg>") center / contain no-repeat; opacity: .8; }
 .empty { margin-top: 12px; padding: 26px; text-align: center; color: var(--muted); font-size: 14px; border: 1.5px dashed var(--line); border-radius: 14px; }
 
