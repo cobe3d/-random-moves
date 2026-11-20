@@ -235,6 +235,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .card.seg { cursor: default; }
 .card.seg .idx { cursor: default; background: var(--c); color: var(--ink); font-family: var(--f-body); font-size: 14px; }
 .card.seg .idx::before { content: none; }
+/* the challenge card always plays first, at group 1's tempo, and stays put */
+.card.chal .idx { cursor: default; font-family: var(--f-body); font-size: 14px; }
+.card.chal .idx::before { content: none; }
 
 /* each card's background song scrolls under it like a marquee, with its change button below */
 .tune { border-top: 1px solid var(--line); padding: 0 0 8px; display: flex; flex-direction: column; gap: 6px; cursor: default; }
@@ -283,7 +286,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
   .card { border-top-width: 5px; border-radius: 12px; }
   .card .idx { top: 6px; left: 5px; min-width: 32px; height: 28px; padding: 0 6px; font-size: 15px; gap: 2px; }
   .card .idx::before { font-size: 11px; }
-  .card.seg .idx { font-size: 11px; padding: 0 6px; }
+  .card.seg .idx, .card.chal .idx { font-size: 11px; padding: 0 6px; }
   .card .re { top: 6px; right: 5px; width: 28px; height: 28px; font-size: 13px; }
   .card .info { flex-direction: column; align-items: flex-start; padding: 6px 7px 7px; gap: 3px; }
   .card .src { font-size: 11px; max-width: 100%; }
@@ -816,6 +819,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
   const keysUnder = n => [...(n.items.length ? [n.path] : []), ...n.children.flatMap(keysUnder)];
   const keyOn = k => !settings.off.includes(k);
   const pool = () => folders.flatMap(allItems).filter(it => keyOn(it.key));
+  // 動作 in a folder named 挑戰 (or anything below it): when it is switched on, one of them is drawn and always plays first
+  const CHAL = '挑戰';
+  const isChal = it => it.key.split('/').includes(CHAL);
   function stateOf(n) {
     const ks = keysUnder(n), on = ks.filter(keyOn).length;
     return on === 0 ? 'false' : on === ks.length ? 'true' : 'mixed';
@@ -838,7 +844,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     row.className = depth ? 'frow' : 'frow top';
     row.setAttribute('role', 'checkbox');
     row.style.setProperty('--depth', depth);
-    row.innerHTML = `<span class="dot" aria-hidden="true"></span><span class="fname"></span><span class="n">${allItems(n).length} 個</span>`;
+    row.innerHTML = `<span class="dot" aria-hidden="true"></span><span class="fname"></span><span class="n">${allItems(n).length} 個${n.name === CHAL ? ' · 只抽 1 個排第一' : ''}</span>`;
     row.querySelector('.fname').textContent = n.name;
     row.addEventListener('click', () => toggle(n));
     folderViews.push(() => row.setAttribute('aria-checked', stateOf(n)));
@@ -898,25 +904,29 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     moved.forEach(c => { c.song = songForCard(c); });
   }
   function drawAll() {
-    const all = pool().slice();
-    if (!all.length) return toast(folders.length ? '先選至少一個資料夾' : '先選擇圖片庫');
-    const n = Math.min(settings.draw, all.length);
+    if (!pool().length) return toast(folders.length ? '先選至少一個資料夾' : '先選擇圖片庫');
+    // a switched-on 挑戰 folder gives exactly one card, placed first; the rest come from the other folders
+    const chal = pool().filter(isChal);
+    const first = chal.length ? [{ clip: pick(chal), g: 0, chal: true }] : [];
+    const all = pool().filter(it => !isChal(it));
+    const n = Math.min(settings.draw - first.length, all.length);
     // partial Fisher–Yates: no picture twice in one round
     for (let i = 0; i < n; i++) {
       const j = i + Math.floor(Math.random() * (all.length - i));
       [all[i], all[j]] = [all[j], all[i]];
     }
-    cards = all.slice(0, n).map(clip => ({ clip, g: 0 }));
+    cards = [...first, ...all.slice(0, n).map(clip => ({ clip, g: 0 }))];
     reassignAll();
     Object.keys(SEGS).forEach(drawSeg);
     // one song per card, drawn one after another so they differ while there are enough to go round
     allDrawn().forEach(c => { c.song = songForCard(c); });
-    if (n < settings.draw) toast(`動作只有 ${n} 個，全部抽出來了`);
+    if (n < settings.draw - first.length) toast(`動作只有 ${n} 個，全部抽出來了`);
     render();
   }
   function redrawOne(i) {
     const used = new Set(cards.map(c => c.clip));
-    const rest = pool().filter(clip => !used.has(clip));
+    // the challenge card swaps for another challenge, the others never turn into one
+    const rest = pool().filter(clip => !used.has(clip) && isChal(clip) === !!cards[i].chal);
     if (!rest.length) return toast('沒有其他圖片可以換了');
     cards[i].clip = pick(rest);
     render();
@@ -1500,11 +1510,11 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     if (cards.length && segOn('warm')) box.appendChild(segCardEl('warm'));
     cards.forEach((c, i) => {
       const el = document.createElement('div');
-      el.className = 'card';
+      el.className = c.chal ? 'card chal' : 'card';
       el.style.setProperty('--c', slotColor(c));
       el.style.setProperty('--ink', slotInk(c));
       el.dataset.i = i;
-      el.innerHTML = `<img alt="" draggable="false"><button class="idx" type="button" aria-label="第 ${i + 1} 個，拖曳或按左右方向鍵調整順序" title="拖曳調整順序">${i + 1}</button>
+      el.innerHTML = `<img alt="" draggable="false"><button class="idx" type="button" aria-label="第 ${i + 1} 個，拖曳或按左右方向鍵調整順序" title="${c.chal ? '挑戰固定排第一' : '拖曳調整順序'}">${c.chal ? '🏆 挑戰' : i + 1}</button>
         <button class="re" type="button" aria-label="換掉第 ${i + 1} 個" title="只換這一個">🔄</button>
         <div class="info"><span class="src"></span><span class="chip">${bpmOf(c)} BPM · ${cardSecs(c)}s</span></div>`;
       el.querySelector('.src').textContent = c.clip.folder + frameNote(c.clip);
@@ -1513,7 +1523,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
       el.querySelector('.re').addEventListener('click', () => redrawOne(i));
       el.querySelector('.idx').addEventListener('keydown', e => {
         const d = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[e.key];
-        if (!d || i + d < 0 || i + d >= cards.length) return;
+        if (!d || i + d < 0 || i + d >= cards.length || c.chal || cards[i + d].chal) return;
         e.preventDefault();
         const order = cards.map((_, k) => k);
         [order[i], order[i + d]] = [order[i + d], order[i]];
@@ -1575,7 +1585,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 
   // ---- reorder by dragging: the card follows the pointer and the others shift around it live ----
   function startDrag(e, el) {
-    if (e.button !== 0 || e.target.closest('.re, .tune')) return;
+    if (e.button !== 0 || e.target.closest('.re, .tune') || el.classList.contains('chal')) return;
     if (e.pointerType === 'touch' && !e.target.closest('.idx')) return;
     const box = $('cards');
     const movable = () => [...box.querySelectorAll('.card:not(.seg)')];
@@ -1596,14 +1606,14 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
         el.classList.add('dragging');
       }
       const over = movable().find(c => {
-        if (c === el) return false;
+        if (c === el || c.classList.contains('chal')) return false;
         const r = c.getBoundingClientRect();
         return ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom;
       });
       if (over) {
         const kids = movable();
         box.insertBefore(el, kids.indexOf(over) > kids.indexOf(el) ? over.nextSibling : over);
-        movable().forEach((c, k) => { c.querySelector('.idx').textContent = k + 1; });
+        movable().forEach((c, k) => { if (!c.classList.contains('chal')) c.querySelector('.idx').textContent = k + 1; });
       }
       place(ev);
     };
@@ -1637,7 +1647,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     const c = cur();
     const seg = c.seg && SEGS[c.seg];
     $('pIdx').textContent = seg ? `${seg.icon} ${seg.label}` + (c.seg === 'boost' && boostRound > 1 ? ` #${boostRound}` : '')
-      : `${cards.indexOf(c) + 1} / ${cards.length}`;
+      : (c.chal ? '🏆 挑戰 · ' : '') + `${cards.indexOf(c) + 1} / ${cards.length}`;
     $('pSrc').textContent = c.clip.folder + ' · ' + c.clip.name.replace(IMG_RE, '').replace(VIDEO_RE, '') + frameNote(c.clip);
     $('pBpm').textContent = seg ? seg.label : bpm();
     $('pUnit').hidden = !!seg;
