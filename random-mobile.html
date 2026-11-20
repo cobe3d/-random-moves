@@ -70,6 +70,7 @@ h1::before { content: ""; width: 32px; height: 32px; flex: none; background: url
 h1::after { content: "✧"; color: var(--accent); font-size: 14px; font-weight: 400; }
 .lib { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
 .lib b { color: var(--fg); }
+.ver { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
 .link { border: 0; background: none; padding: 0; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; font-size: 13px; }
 
 .section-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -376,6 +377,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
   <header>
     <h1>隨機動作圖片・手機版</h1>
     <button class="secondary small" id="installBtn" type="button" hidden>📲 安裝到主畫面</button>
+    <span class="ver"><span id="appVer"></span><button class="link" id="checkUpdate" type="button">檢查更新</button></span>
     <div class="lib" id="libBar" hidden>
       <span id="libInfo"></span>
       <span id="storeInfo"></span>
@@ -820,8 +822,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
   const keyOn = k => !settings.off.includes(k);
   const pool = () => folders.flatMap(allItems).filter(it => keyOn(it.key));
   // 動作 in a folder named 挑戰 (or anything below it): when it is switched on, one of them is drawn and always plays first
-  const CHAL = '挑戰';
-  const isChal = it => it.key.split('/').includes(CHAL);
+  // any folder whose name has 挑戰 (or 挑战) in it counts, so extra spaces or numbers around the word don't matter
+  const isChalName = name => /挑[戰战]/.test(name);
+  const isChal = it => it.key.split('/').some(isChalName);
   function stateOf(n) {
     const ks = keysUnder(n), on = ks.filter(keyOn).length;
     return on === 0 ? 'false' : on === ks.length ? 'true' : 'mixed';
@@ -844,7 +847,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     row.className = depth ? 'frow' : 'frow top';
     row.setAttribute('role', 'checkbox');
     row.style.setProperty('--depth', depth);
-    row.innerHTML = `<span class="dot" aria-hidden="true"></span><span class="fname"></span><span class="n">${allItems(n).length} 個${n.name === CHAL ? ' · 只抽 1 個排第一' : ''}</span>`;
+    row.innerHTML = `<span class="dot" aria-hidden="true"></span><span class="fname"></span><span class="n">${allItems(n).length} 個${isChalName(n.name) ? ' · 只抽 1 個排第一' : ''}</span>`;
     row.querySelector('.fname').textContent = n.name;
     row.addEventListener('click', () => toggle(n));
     folderViews.push(() => row.setAttribute('aria-checked', stateOf(n)));
@@ -1702,6 +1705,27 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
     }
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+  // shown in the header, so it's easy to tell which version the phone is running; keep it equal to VERSION in sw.js
+  const APP_VERSION = 'm12-1';
+  $('appVer').textContent = '版本 ' + APP_VERSION;
+  // compare with the version on the site; when it's newer, drop the stored copy of the page (the imported
+  // pictures and music stay) and load the page fresh from the site
+  $('checkUpdate').addEventListener('click', async () => {
+    if (!('serviceWorker' in navigator) || location.protocol === 'file:') return location.reload();
+    let live;
+    try {
+      const res = await fetch('sw.js?check=' + Date.now(), { cache: 'no-store' });
+      live = ((await res.text()).match(/VERSION = '([^']+)'/) || [])[1];
+    } catch (e) { return toast('要連上網路才能檢查更新'); }
+    if (!live) return toast('檢查不到網站上的版本，稍後再試');
+    if (live === APP_VERSION) return toast('已經是最新版（' + APP_VERSION + '）');
+    toast('更新到 ' + live + '…');
+    try {
+      for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+      for (const k of await caches.keys()) await caches.delete(k);
+    } catch (e) {}
+    location.reload();
+  });
   let installPrompt = null;
   window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault();

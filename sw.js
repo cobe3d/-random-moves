@@ -1,6 +1,6 @@
 // Keeps the mobile page and its icons on the phone, so the installed app opens without internet.
 // Bump VERSION whenever random-mobile.html changes, so phones swap in the new copy.
-const VERSION = 'm11-1';
+const VERSION = 'm12-1';
 const FILES = ['./', './index.html', './random-mobile.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -20,7 +20,10 @@ self.addEventListener('activate', e => {
 // answer from the stored copy straight away (works offline), and refresh that copy in the background when online
 self.addEventListener('fetch', e => {
   const req = e.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  const url = new URL(req.url);
+  if (req.method !== 'GET' || url.origin !== location.origin) return;
+  // the page reads sw.js to see which version is on the site, so that always goes to the site
+  if (url.pathname.endsWith('/sw.js')) return;
   e.respondWith(caches.match(req, { ignoreSearch: true }).then(cached => {
     // ask the site whether the file changed instead of taking the browser's possibly stale copy
     const fresh = fetch(req.url, { cache: 'no-cache' }).then(res => {
