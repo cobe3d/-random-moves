@@ -1,10 +1,14 @@
 // Keeps the mobile page and its icons on the phone, so the installed app opens without internet.
 // Bump VERSION whenever random-mobile.html changes, so phones swap in the new copy.
-const VERSION = 'm10-1';
+const VERSION = 'm11-1';
 const FILES = ['./', './index.html', './random-mobile.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // straight from the site, not the browser's own copy: GitHub Pages lets that be up to 10 minutes old,
+  // which could pack the previous page into the new version's store
+  e.waitUntil(caches.open(VERSION)
+    .then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'reload' }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -18,7 +22,8 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   e.respondWith(caches.match(req, { ignoreSearch: true }).then(cached => {
-    const fresh = fetch(req).then(res => {
+    // ask the site whether the file changed instead of taking the browser's possibly stale copy
+    const fresh = fetch(req.url, { cache: 'no-cache' }).then(res => {
       if (res.ok) {
         const copy = res.clone();
         caches.open(VERSION).then(c => c.put(req, copy));

@@ -1691,7 +1691,17 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
   }
 
   // ---- offline app: keep the page on the phone so it opens without internet, and offer to install it ----
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    // an app that already ran offline swaps in a newer version once it has downloaded, a few seconds after opening:
+    // reload straight away when nothing is drawn yet, otherwise leave it for the next time the app opens
+    if (navigator.serviceWorker.controller) {
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if ($('player').hidden && !cards.length) location.reload();
+        else toast('新版已下載，下次打開 App 就會更新');
+      });
+    }
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
   let installPrompt = null;
   window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault();
